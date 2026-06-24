@@ -124,6 +124,8 @@ function logout() {
 // INICIALIZACIÓN
 window.onload = function() {
     checkSession();
+};
+
 // CARGAR DATOS DEL DASHBOARD
 function loadDashboard() {
     const userStr = localStorage.getItem("user");
