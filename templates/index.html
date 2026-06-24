@@ -41,10 +41,24 @@
         </div>
     </div>
 
+    <!-- HEADER MÓVIL -->
+    <div class="mobile-header">
+        <button id="mobile-menu-toggle" class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+        <span class="mobile-logo">💈 SmartBarber</span>
+        <div class="mobile-user-role" id="mobile-user-role-lbl">Admin</div>
+    </div>
+    
+    <!-- BACKDROP PARA MENÚ MÓVIL -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop" onclick="toggleMobileMenu()"></div>
+
     <div class="app-container">
         
         <!-- SIDEBAR DE NAVEGACIÓN -->
         <aside class="sidebar">
+            <div class="sidebar-mobile-close">
+                <button class="mobile-close-btn" onclick="toggleMobileMenu()">×</button>
+            </div>
+            
             <div class="logo-area">
                 <span class="logo-icon">💈</span>
                 <h2>SmartBarber</h2>

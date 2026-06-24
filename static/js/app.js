@@ -18,6 +18,14 @@ function switchTab(tabId) {
             btn.classList.add('active');
         }
     });
+
+    // Cerrar menú móvil si está abierto
+    const sidebar = document.querySelector('.sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (sidebar && sidebar.classList.contains('open')) {
+        sidebar.classList.remove('open');
+        if (backdrop) backdrop.classList.remove('active');
+    }
 }
 
 // CONTROL DE SESIÓN Y USUARIOS
@@ -36,6 +44,11 @@ function checkSession() {
     // Actualizar perfil en el Sidebar
     document.getElementById("user-display-name").innerText = user.username.toUpperCase();
     document.getElementById("user-display-role").innerText = user.role === 'admin' ? 'Dueño (Admin)' : 'Barbero';
+    
+    const mobileRole = document.getElementById("mobile-user-role-lbl");
+    if (mobileRole) {
+        mobileRole.innerText = user.role === 'admin' ? 'Admin' : 'Barbero';
+    }
     
     // Restringir visualización según rol
     const navDashboard = document.getElementById("nav-dashboard");
@@ -1112,4 +1125,16 @@ function updateCharts(data) {
             cutout: '65%'
         }
     });
+}
+
+// CONTROL DE MENÚ MÓVIL DESPLEGABLE (SIDEBAR DRAWER)
+function toggleMobileMenu() {
+    const sidebar = document.querySelector('.sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (sidebar) {
+        sidebar.classList.toggle('open');
+    }
+    if (backdrop) {
+        backdrop.classList.toggle('active');
+    }
 }
