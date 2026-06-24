@@ -123,6 +123,25 @@ def get_dashboard_data():
             "barbero_nombre": b_nom
         })
         
+    cursor.execute("""
+    SELECT s.id, s.servicio_nombre, s.monto_cobrado, s.metodo_pago, s.ml_consumidos, s.insumo_id, s.fecha, b.nombre 
+    FROM servicios_realizados s 
+    JOIN barberos b ON s.barbero_id = b.id 
+    WHERE s.aprobado = 1 AND strftime('%Y-%m', s.fecha) = ?
+    """, (mes_ano,))
+    servicios_aprobados = []
+    for s_id, s_nom, s_monto, s_pago, s_ml, s_ins_id, s_fecha, b_nom in cursor.fetchall():
+        servicios_aprobados.append({
+            "id": s_id,
+            "servicio_nombre": s_nom,
+            "monto_cobrado": s_monto,
+            "metodo_pago": s_pago,
+            "ml_consumidos": s_ml,
+            "insumo_id": s_ins_id,
+            "fecha": s_fecha,
+            "barbero_nombre": b_nom
+        })
+        
     conn.close()
     
     # Obtener liquidación estimada en tiempo real
@@ -142,6 +161,7 @@ def get_dashboard_data():
         "inversion_items": inversion_items,
         "gastos_items": gastos_items,
         "servicios_pendientes": servicios_pendientes,
+        "servicios_aprobados": servicios_aprobados,
         "status_estimado": status_estimado
     })
 
@@ -288,6 +308,57 @@ def reject_service(srv_id):
     conn.commit()
     conn.close()
     return jsonify({"status": "success", "message": "Servicio rechazado y eliminado."})
+
+@app.route('/api/servicio/<int:srv_id>', methods=['PUT'])
+def update_service(srv_id):
+    """
+    Modifica el monto cobrado de un servicio auditado/registrado.
+    """
+    data = request.get_json() or {}
+    monto_cobrado = data.get("monto_cobrado")
+    
+    if monto_cobrado is None or float(monto_cobrado) <= 0:
+        return jsonify({"error": "Monto cobrado inválido."}), 400
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE servicios_realizados SET monto_cobrado = ? WHERE id = ?", (float(monto_cobrado), srv_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Servicio actualizado correctamente."})
+
+@app.route('/api/barbero/servicios')
+def get_barbero_servicios():
+    """
+    Retorna la lista de servicios cargados por un barbero en el mes, EXCLUYENDO montos financieros.
+    """
+    barbero_id = request.args.get("barbero_id")
+    if not barbero_id:
+        return jsonify({"error": "Falta barbero_id"}), 400
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    mes_ano = "2026-06"
+    cursor.execute("""
+    SELECT id, servicio_nombre, metodo_pago, ml_consumidos, insumo_id, fecha, aprobado
+    FROM servicios_realizados
+    WHERE barbero_id = ? AND strftime('%Y-%m', fecha) = ?
+    ORDER BY fecha DESC, id DESC
+    """, (barbero_id, mes_ano))
+    
+    servicios = []
+    for s_id, s_nom, s_pago, s_ml, s_ins_id, s_fecha, aprobado in cursor.fetchall():
+        servicios.append({
+            "id": s_id,
+            "servicio_nombre": s_nom,
+            "metodo_pago": s_pago,
+            "ml_consumidos": s_ml,
+            "insumo_id": s_ins_id,
+            "fecha": s_fecha,
+            "aprobado": aprobado
+        })
+    conn.close()
+    return jsonify(servicios)
 
 @app.route('/api/gasto', methods=['POST'])
 def register_expense():

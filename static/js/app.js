@@ -124,8 +124,6 @@ function logout() {
 // INICIALIZACIÓN
 window.onload = function() {
     checkSession();
-};
-
 // CARGAR DATOS DEL DASHBOARD
 function loadDashboard() {
     const userStr = localStorage.getItem("user");
@@ -247,6 +245,49 @@ function loadDashboard() {
                 }
             } else {
                 if (adminAuditCard) adminAuditCard.classList.add('hidden');
+            }
+
+            // Actualizar Historial de Servicios Auditados (Admin Only)
+            const auditedTable = document.getElementById('audited-services-table-body');
+            const adminAuditedCard = document.getElementById('admin-audited-services-card');
+            
+            if (user.role === 'admin') {
+                if (adminAuditedCard) adminAuditedCard.classList.remove('hidden');
+                if (auditedTable) {
+                    auditedTable.innerHTML = '';
+                    if (!data.servicios_aprobados || data.servicios_aprobados.length === 0) {
+                        auditedTable.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding: 24px;">No hay servicios auditados en este mes.</td></tr>`;
+                    } else {
+                        data.servicios_aprobados.forEach(s => {
+                            const tr = document.createElement('tr');
+                            const insumoUsado = s.insumo_id ? `${s.ml_consumidos} ml` : '-';
+                            tr.innerHTML = `
+                                <td><strong>${s.barbero_nombre}</strong></td>
+                                <td>${s.servicio_nombre}</td>
+                                <td>$${s.monto_cobrado.toLocaleString('es-AR')}</td>
+                                <td>${s.metodo_pago}</td>
+                                <td>${insumoUsado}</td>
+                                <td>${s.fecha}</td>
+                                <td>
+                                    <span class="action-icon edit" onclick="editAuditedService(${s.id}, ${s.monto_cobrado})" title="Editar Monto" style="color: var(--accent); cursor: pointer; margin-right: 12px; font-size: 16px;">✏️</span>
+                                    <span class="action-icon reject" onclick="rejectService(${s.id})" title="Rechazar y Eliminar" style="color: var(--danger); cursor: pointer; font-size: 16px;">❌</span>
+                                </td>
+                            `;
+                            auditedTable.appendChild(tr);
+                        });
+                    }
+                }
+            } else {
+                if (adminAuditedCard) adminAuditedCard.classList.add('hidden');
+            }
+
+            // Para barberos, cargar sus propios servicios (sin montos)
+            const barberServicesCard = document.getElementById('barber-services-card');
+            if (user.role === 'barber') {
+                if (barberServicesCard) barberServicesCard.classList.remove('hidden');
+                loadBarberServices(user.barbero_id);
+            } else {
+                if (barberServicesCard) barberServicesCard.classList.add('hidden');
             }
 
             // Actualizar Turnos Recientes
@@ -798,4 +839,72 @@ function rejectService(id) {
     .catch(err => {
         alert("Error al rechazar servicio: " + err.message);
     });
+}
+
+// EDITAR SERVICIO AUDITADO (ADMIN ONLY)
+function editAuditedService(id, currentMonto) {
+    const finalMontoStr = prompt("Modificar el monto cobrado para este servicio auditado ($):", currentMonto);
+    if (finalMontoStr === null) return;
+    
+    const finalMonto = parseFloat(finalMontoStr);
+    if (isNaN(finalMonto) || finalMonto <= 0) {
+        alert("Por favor ingresa un monto válido.");
+        return;
+    }
+    
+    fetch(`/api/servicio/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monto_cobrado: finalMonto })
+    })
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) {
+            throw new Error((data && data.error) || 'Error al actualizar servicio');
+        }
+        return data;
+    })
+    .then(data => {
+        alert(data.message);
+        loadDashboard();
+    })
+    .catch(err => {
+        alert("Error al editar servicio: " + err.message);
+    });
+}
+
+// CARGAR SERVICIOS PROPIOS DEL BARBERO (SIN MONTOS)
+function loadBarberServices(barberoId) {
+    fetch(`/api/barbero/servicios?barbero_id=${barberoId}`)
+        .then(res => {
+            if (!res.ok) throw new Error("Error al obtener tus servicios.");
+            return res.json();
+        })
+        .then(data => {
+            const tbody = document.getElementById("barber-services-table-body");
+            if (tbody) {
+                tbody.innerHTML = '';
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding: 24px;">No has registrado servicios este mes.</td></tr>`;
+                    return;
+                }
+                data.forEach(s => {
+                    const tr = document.createElement("tr");
+                    const statusText = s.aprobado === 1 ? '<span style="color: var(--success); font-weight: bold;">✅ Auditado y Aprobado</span>' : '<span style="color: var(--warning); font-weight: bold;">⏳ Pendiente de Auditoría</span>';
+                    const insumoUsado = s.insumo_id ? `${s.ml_consumidos} ml` : '-';
+                    tr.innerHTML = `
+                        <td><strong>${s.servicio_nombre}</strong></td>
+                        <td>${s.metodo_pago}</td>
+                        <td>${insumoUsado}</td>
+                        <td>${s.fecha}</td>
+                        <td>${statusText}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        })
+        .catch(err => {
+            console.error("Error al cargar servicios del barbero:", err);
+        });
 }

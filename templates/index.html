@@ -214,6 +214,28 @@
                     </table>
                 </div>
 
+                <!-- HISTORIAL DE SERVICIOS AUDITADOS (ADMIN ONLY) -->
+                <div id="admin-audited-services-card" class="detail-card hidden" style="margin-top: 32px;">
+                    <h3>Servicios Auditados y Aprobados (Junio)</h3>
+                    <p class="card-desc">Listado de servicios que ya han sido auditados. Aún puedes editar el monto o eliminarlos si es necesario.</p>
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Barbero</th>
+                                <th>Servicio</th>
+                                <th>Monto Cobrado</th>
+                                <th>Método de Pago</th>
+                                <th>Insumo Usado</th>
+                                <th>Fecha</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audited-services-table-body">
+                            <!-- Carga dinámica -->
+                        </tbody>
+                    </table>
+                </div>
+
                 <!-- LISTADO DE TURNOS -->
                 <div class="detail-card" style="margin-top: 32px;">
                     <h3>Turnos Recientes Agendados</h3>
@@ -342,6 +364,26 @@
 
                         <button class="btn btn-primary" onclick="submitService()">Registrar Servicio</button>
                     </div>
+                </div>
+
+                <!-- LISTADO DE SERVICIOS PROPIOS (BARBERO ONLY) -->
+                <div id="barber-services-card" class="detail-card hidden" style="margin-top: 32px;">
+                    <h3>Mis Servicios Registrados (Mes en curso)</h3>
+                    <p class="card-desc">Historial de cortes y tinturas que has cargado este mes y su estado de auditoría (sin montos financieros).</p>
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Servicio</th>
+                                <th>Método de Pago</th>
+                                <th>Insumo Usado</th>
+                                <th>Fecha</th>
+                                <th>Estado de Auditoría</th>
+                            </tr>
+                        </thead>
+                        <tbody id="barber-services-table-body">
+                            <!-- Carga dinámica -->
+                        </tbody>
+                    </table>
                 </div>
             </section>
 
