@@ -166,9 +166,10 @@ class FinanceAgent:
     def __init__(self):
         pass
 
-    def run_monthly_closure(self, mes_ano):
+    def calculate_monthly_status(self, mes_ano):
         """
-        Calcula la liquidación financiera del mes y aplica las comisiones dinámicas y la amortización.
+        Calcula la liquidación financiera del mes y estima las comisiones dinámicas y la amortización,
+        sin persistir cambios en la tabla de amortizaciones.
         """
         conn = get_connection()
         cursor = conn.cursor()
@@ -185,21 +186,18 @@ class FinanceAgent:
         
         total_gastos_local = gastos_fijos + gastos_insumos
         
-        # 3. Obtener el bruto generado por cada barbero
-        # (Filtramos por servicios cargados en ese mes)
+        # 3. Obtener el bruto generado por cada barbero (solo APROBADOS)
         cursor.execute("""
         SELECT barbero_id, SUM(monto_cobrado) 
         FROM servicios_realizados 
-        WHERE strftime('%Y-%m', fecha) = ?
+        WHERE strftime('%Y-%m', fecha) = ? AND aprobado = 1
         GROUP BY barbero_id
         """, (mes_ano,))
         
         servicios_por_barbero = cursor.fetchall()
-        
         total_bruto_generado = sum(s[1] for s in servicios_por_barbero)
         
         # 4. Evaluación de la Comisión Dinámica
-        # Si el 50% retenido por la barbería es menor que los gastos mensuales totales, se activa el 40%
         local_share_standard = total_bruto_generado * 0.50
         
         if total_bruto_generado == 0:
@@ -212,7 +210,7 @@ class FinanceAgent:
             comision_efectiva = 50.0
             contingencia_activa = False
             
-        # 5. Calcular liquidación para cada barbero y guardar resultados
+        # 5. Calcular liquidación para cada barbero
         reporte_barberos = []
         shop_share_total = 0.0
         barber_payout_total = 0.0
@@ -224,10 +222,10 @@ class FinanceAgent:
             payout = bruto * (comision_efectiva / 100.0)
             shop_cut = bruto * ((100.0 - comision_efectiva) / 100.0)
             
-            # Obtener propinas digitales si las hubiera
+            # Obtener propinas digitales si las hubiera (solo aprobadas)
             cursor.execute("""
             SELECT SUM(propina_digital) FROM servicios_realizados 
-            WHERE barbero_id = ? AND strftime('%Y-%m', fecha) = ?
+            WHERE barbero_id = ? AND strftime('%Y-%m', fecha) = ? AND aprobado = 1
             """, (barbero_id, mes_ano))
             propinas = cursor.fetchone()[0]
             propinas = propinas if propinas else 0.0
@@ -246,11 +244,9 @@ class FinanceAgent:
             barber_payout_total += payout
             
         # 6. Calcular ganancia neta del dueño
-        # Ganancia Neta del Dueño = Porción de la Barbería - Gastos del Local
         ganancia_neta_dueno = shop_share_total - total_gastos_local
         
         # 7. Amortización de la inversión inicial
-        # Obtener inversión total
         cursor.execute("SELECT SUM(monto_pesos) FROM inversion_inicial")
         inversion_total = cursor.fetchone()[0]
         inversion_total = inversion_total if inversion_total else 0.0
@@ -266,17 +262,9 @@ class FinanceAgent:
         monto_amortizado = 0.0
         nuevo_saldo = saldo_pendiente_previo
         
-        # Durante la fase de apertura, el 100% de la ganancia del dueño va a amortizar
         if ganancia_neta_dueno > 0 and saldo_pendiente_previo > 0:
             monto_amortizado = min(ganancia_neta_dueno, saldo_pendiente_previo)
             nuevo_saldo = saldo_pendiente_previo - monto_amortizado
-            
-            # Guardar registro en tabla amortizaciones
-            cursor.execute("""
-            INSERT INTO amortizaciones (mes_ano, monto_amortizado, saldo_pendiente)
-            VALUES (?, ?, ?)
-            """, (mes_ano, monto_amortizado, nuevo_saldo))
-            conn.commit()
             
         conn.close()
         
@@ -287,7 +275,8 @@ class FinanceAgent:
             "gastos_insumos": gastos_insumos,
             "total_gastos_local": total_gastos_local,
             "contingencia_comision_activa": contingencia_activa,
-            "comision_aplicada": comision_efectiva,
+            "comision_applied": comision_efectiva,
+            "comision_aplicada": comision_efectiva, # retrocompatibilidad
             "retencion_local_total": shop_share_total,
             "ganancia_neta_dueno_bruta": ganancia_neta_dueno,
             "monto_amortizado_este_mes": monto_amortizado,
@@ -297,6 +286,30 @@ class FinanceAgent:
             "retorno_porcentaje": round(((inversion_total - nuevo_saldo) / inversion_total * 100) if inversion_total > 0 else 0.0, 2),
             "reporte_barberos": reporte_barberos
         }
+
+    def run_monthly_closure(self, mes_ano):
+        """
+        Calcula la liquidación financiera y guarda el registro de amortización si corresponde,
+        previniendo duplicaciones para el mismo mes.
+        """
+        status = self.calculate_monthly_status(mes_ano)
+        
+        if status["monto_amortizado_este_mes"] > 0:
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Verificar si ya existe amortización registrada para este mes
+            cursor.execute("SELECT COUNT(*) FROM amortizaciones WHERE mes_ano = ?", (mes_ano,))
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("""
+                INSERT INTO amortizaciones (mes_ano, monto_amortizado, saldo_pendiente)
+                VALUES (?, ?, ?)
+                """, (mes_ano, status["monto_amortizado_este_mes"], status["saldo_pendiente_inversion"]))
+                conn.commit()
+                
+            conn.close()
+            
+        return status
 
 
 # ==========================================

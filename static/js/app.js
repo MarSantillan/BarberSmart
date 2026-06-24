@@ -90,11 +90,14 @@ function submitLogin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
     })
-    .then(res => {
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
         if (!res.ok) {
-            throw new Error("Credenciales inválidas");
+            const error = (data && data.message) || "Usuario o contraseña incorrectos";
+            throw new Error(error);
         }
-        return res.json();
+        return data;
     })
     .then(data => {
         errorMsg.classList.add("hidden");
@@ -102,6 +105,7 @@ function submitLogin() {
         checkSession();
     })
     .catch(err => {
+        errorMsg.innerText = err.message;
         errorMsg.classList.remove("hidden");
     });
 }
@@ -124,8 +128,15 @@ window.onload = function() {
 
 // CARGAR DATOS DEL DASHBOARD
 function loadDashboard() {
+    const userStr = localStorage.getItem("user");
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+
     fetch('/api/dashboard')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error("Error al obtener los datos del dashboard");
+            return res.json();
+        })
         .then(data => {
             // Actualizar KPIs
             document.getElementById('kpi-inversion').innerText = `$${data.inversion_total.toLocaleString('es-AR')}`;
@@ -173,6 +184,70 @@ function loadDashboard() {
                 `;
                 alertsDiv.appendChild(card);
             });
+
+            // Actualizar Liquidación Estimada (Admin Only)
+            const estimatedPayoutsCard = document.getElementById('admin-estimated-payouts-card');
+            const estimatedPayoutsTable = document.getElementById('estimated-payouts-table-body');
+            
+            if (user.role === 'admin') {
+                if (estimatedPayoutsCard) estimatedPayoutsCard.classList.remove('hidden');
+                if (estimatedPayoutsTable) {
+                    estimatedPayoutsTable.innerHTML = '';
+                    if (!data.status_estimado || !data.status_estimado.reporte_barberos || data.status_estimado.reporte_barberos.length === 0) {
+                        estimatedPayoutsTable.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding: 24px;">No hay servicios aprobados para liquidar en este mes.</td></tr>`;
+                    } else {
+                        data.status_estimado.reporte_barberos.forEach(b => {
+                            const tr = document.createElement('tr');
+                            const totalPagar = b.payout_neto + b.propinas_digitales;
+                            tr.innerHTML = `
+                                <td><strong>${b.nombre}</strong></td>
+                                <td>$${b.bruto_generado.toLocaleString('es-AR')}</td>
+                                <td>${b.comision_porcentaje}%</td>
+                                <td>$${b.payout_neto.toLocaleString('es-AR')}</td>
+                                <td>$${b.propinas_digitales.toLocaleString('es-AR')}</td>
+                                <td><strong style="color: var(--success);">$${totalPagar.toLocaleString('es-AR')}</strong></td>
+                            `;
+                            estimatedPayoutsTable.appendChild(tr);
+                        });
+                    }
+                }
+            } else {
+                if (estimatedPayoutsCard) estimatedPayoutsCard.classList.add('hidden');
+            }
+
+            // Actualizar Servicios Pendientes de Auditoría (Admin Only)
+            const auditTable = document.getElementById('audit-table-body');
+            const adminAuditCard = document.getElementById('admin-audit-card');
+            
+            if (user.role === 'admin') {
+                if (adminAuditCard) adminAuditCard.classList.remove('hidden');
+                if (auditTable) {
+                    auditTable.innerHTML = '';
+                    if (!data.servicios_pendientes || data.servicios_pendientes.length === 0) {
+                        auditTable.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding: 24px;">No hay servicios pendientes de auditoría.</td></tr>`;
+                    } else {
+                        data.servicios_pendientes.forEach(s => {
+                            const tr = document.createElement('tr');
+                            const insumoUsado = s.insumo_id ? `${s.ml_consumidos} ml` : '-';
+                            tr.innerHTML = `
+                                <td><strong>${s.barbero_nombre}</strong></td>
+                                <td>${s.servicio_nombre}</td>
+                                <td>$${s.monto_cobrado.toLocaleString('es-AR')}</td>
+                                <td>${s.metodo_pago}</td>
+                                <td>${insumoUsado}</td>
+                                <td>${s.fecha}</td>
+                                <td>
+                                    <span class="action-icon approve" onclick="approveService(${s.id}, ${s.monto_cobrado})" title="Verificar y Aprobar" style="color: var(--success); cursor: pointer; margin-right: 12px; font-size: 16px;">✔️</span>
+                                    <span class="action-icon reject" onclick="rejectService(${s.id})" title="Rechazar y Eliminar" style="color: var(--danger); cursor: pointer; font-size: 16px;">❌</span>
+                                </td>
+                            `;
+                            auditTable.appendChild(tr);
+                        });
+                    }
+                }
+            } else {
+                if (adminAuditCard) adminAuditCard.classList.add('hidden');
+            }
 
             // Actualizar Turnos Recientes
             const turnosTable = document.getElementById('turnos-table-body');
@@ -238,6 +313,9 @@ function loadDashboard() {
                 });
             }
             loadAgenda();
+        })
+        .catch(err => {
+            console.error("Error al cargar dashboard: ", err);
         });
 }
 
@@ -309,6 +387,11 @@ function submitService() {
     const insumo_id = isTintura ? document.getElementById('srv-insumo').value : null;
     const ml_consumidos = isTintura ? document.getElementById('srv-ml').value : 0;
 
+    if (!monto_cobrado || parseFloat(monto_cobrado) <= 0) {
+        alert("Por favor ingresa un monto cobrado válido.");
+        return;
+    }
+
     fetch('/api/servicio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -321,13 +404,24 @@ function submitService() {
             ml_consumidos
         })
     })
-    .then(res => res.json())
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) {
+            const error = (data && data.error) || 'Error al registrar servicio';
+            throw new Error(error);
+        }
+        return data;
+    })
     .then(data => {
         alert(data.message);
         if (data.alerta_insumo) {
             alert(data.alerta_insumo);
         }
         loadDashboard();
+    })
+    .catch(err => {
+        alert("Error al registrar servicio: " + err.message);
     });
 }
 
@@ -336,8 +430,8 @@ function submitExpense() {
     const concepto = document.getElementById('gst-concepto').value.trim();
     const monto = document.getElementById('gst-monto').value;
     
-    if (!concepto || !monto) {
-        alert("Por favor completa los campos del gasto.");
+    if (!concepto || !monto || parseFloat(monto) <= 0) {
+        alert("Por favor completa los campos del gasto con un valor mayor a cero.");
         return;
     }
 
@@ -346,12 +440,23 @@ function submitExpense() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concepto, monto })
     })
-    .then(res => res.json())
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) {
+            const error = (data && data.error) || 'Error al registrar gasto';
+            throw new Error(error);
+        }
+        return data;
+    })
     .then(data => {
         alert(data.message);
         document.getElementById('gst-concepto').value = '';
         document.getElementById('gst-monto').value = '';
         loadDashboard();
+    })
+    .catch(err => {
+        alert("Error al registrar gasto: " + err.message);
     });
 }
 
@@ -361,8 +466,8 @@ function submitInversion() {
     const detalle = document.getElementById('inv-detalle').value.trim();
     const monto = document.getElementById('inv-monto').value;
     
-    if (!detalle || !monto) {
-        alert("Por favor completa los campos del item de inversión.");
+    if (!detalle || !monto || parseFloat(monto) <= 0) {
+        alert("Por favor completa los campos de inversión con un valor mayor a cero.");
         return;
     }
 
@@ -371,12 +476,23 @@ function submitInversion() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rubro, detalle, monto })
     })
-    .then(res => res.json())
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) {
+            const error = (data && data.error) || 'Error al registrar inversión';
+            throw new Error(error);
+        }
+        return data;
+    })
     .then(data => {
         alert(data.message);
         document.getElementById('inv-detalle').value = '';
         document.getElementById('inv-monto').value = '';
         loadDashboard();
+    })
+    .catch(err => {
+        alert("Error al registrar inversión: " + err.message);
     });
 }
 
@@ -385,11 +501,17 @@ function deleteInversion(id) {
     if (!confirm("¿Estás seguro de que deseas eliminar este item de inversión?")) return;
     
     fetch(`/api/inversion/${id}`, { method: 'DELETE' })
-        .then(res => res.json())
+        .then(async res => {
+            const isJson = res.headers.get('content-type')?.includes('application/json');
+            const data = isJson ? await res.json() : null;
+            if (!res.ok) throw new Error((data && data.error) || 'Error al eliminar inversión');
+            return data;
+        })
         .then(data => {
             alert(data.message);
             loadDashboard();
-        });
+        })
+        .catch(err => alert("Error: " + err.message));
 }
 
 function editInversion(id, currentRubro, currentDetalle, currentMonto) {
@@ -411,11 +533,17 @@ function editInversion(id, currentRubro, currentDetalle, currentMonto) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rubro, detalle, monto })
     })
-    .then(res => res.json())
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) throw new Error((data && data.error) || 'Error al actualizar inversión');
+        return data;
+    })
     .then(data => {
         alert(data.message);
         loadDashboard();
-    });
+    })
+    .catch(err => alert("Error: " + err.message));
 }
 
 // ELIMINAR Y EDITAR GASTO
@@ -423,11 +551,17 @@ function deleteExpense(id) {
     if (!confirm("¿Estás seguro de que deseas eliminar este gasto mensual?")) return;
     
     fetch(`/api/gasto/${id}`, { method: 'DELETE' })
-        .then(res => res.json())
+        .then(async res => {
+            const isJson = res.headers.get('content-type')?.includes('application/json');
+            const data = isJson ? await res.json() : null;
+            if (!res.ok) throw new Error((data && data.error) || 'Error al eliminar gasto');
+            return data;
+        })
         .then(data => {
             alert(data.message);
             loadDashboard();
-        });
+        })
+        .catch(err => alert("Error: " + err.message));
 }
 
 function editExpense(id, currentConcepto, currentMonto) {
@@ -447,11 +581,17 @@ function editExpense(id, currentConcepto, currentMonto) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concepto, monto })
     })
-    .then(res => res.json())
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) throw new Error((data && data.error) || 'Error al actualizar gasto');
+        return data;
+    })
     .then(data => {
         alert(data.message);
         loadDashboard();
-    });
+    })
+    .catch(err => alert("Error: " + err.message));
 }
 
 // EJECUTAR CIERRE MENSUAL
@@ -463,7 +603,12 @@ function runMonthlyClosure() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mes_ano })
     })
-    .then(res => res.json())
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) throw new Error((data && data.error) || 'Error al ejecutar cierre contable');
+        return data;
+    })
     .then(data => {
         const resultBox = document.getElementById('closure-result');
         resultBox.classList.remove('hidden');
@@ -499,6 +644,9 @@ function runMonthlyClosure() {
         `;
         
         loadDashboard();
+    })
+    .catch(err => {
+        alert("Error al ejecutar cierre: " + err.message);
     });
 }
 
@@ -592,4 +740,62 @@ function loadAgenda() {
                 });
             }
         });
+}
+
+// AUDITORÍA DE SERVICIOS (ADMIN ONLY)
+function approveService(id, currentMonto) {
+    const finalMontoStr = prompt("Confirmar o corregir el monto cobrado para este servicio ($):", currentMonto);
+    if (finalMontoStr === null) return; // canceló
+    
+    const finalMonto = parseFloat(finalMontoStr);
+    if (isNaN(finalMonto) || finalMonto <= 0) {
+        alert("Por favor ingresa un monto válido.");
+        return;
+    }
+    
+    fetch(`/api/servicio/aprobar/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monto_cobrado: finalMonto })
+    })
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) {
+            const error = (data && data.error) || res.statusText || 'Error en el servidor';
+            throw new Error(error);
+        }
+        return data;
+    })
+    .then(data => {
+        alert(data.message);
+        loadDashboard();
+    })
+    .catch(err => {
+        alert("Error al aprobar servicio: " + err.message);
+    });
+}
+
+function rejectService(id) {
+    if (!confirm("¿Estás seguro de que deseas rechazar y eliminar este servicio? El barbero tendrá que cargarlo de nuevo.")) return;
+    
+    fetch(`/api/servicio/rechazar/${id}`, {
+        method: 'POST'
+    })
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) {
+            const error = (data && data.error) || res.statusText || 'Error en el servidor';
+            throw new Error(error);
+        }
+        return data;
+    })
+    .then(data => {
+        alert(data.message);
+        loadDashboard();
+    })
+    .catch(err => {
+        alert("Error al rechazar servicio: " + err.message);
+    });
 }

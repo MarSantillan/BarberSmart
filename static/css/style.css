@@ -818,8 +818,13 @@ body {
     color: var(--accent);
 }
 
-.action-icon.delete:hover {
+.action-icon.delete:hover,
+.action-icon.reject:hover {
     color: var(--danger);
+}
+
+.action-icon.approve:hover {
+    color: var(--success);
 }
 
 

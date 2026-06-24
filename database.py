@@ -59,6 +59,7 @@ def init_db():
         ml_consumidos REAL DEFAULT 0.0,
         insumo_id INTEGER,
         fecha TEXT NOT NULL, -- Formato: YYYY-MM-DD
+        aprobado INTEGER DEFAULT 0, -- 0: Pendiente de auditoría, 1: Aprobado por Admin
         FOREIGN KEY (turno_id) REFERENCES turnos (id),
         FOREIGN KEY (barbero_id) REFERENCES barberos (id),
         FOREIGN KEY (insumo_id) REFERENCES insumos (id)
@@ -155,6 +156,18 @@ def seed_db():
             ('martin', 'martin123', 'barber', 2)
         ]
         cursor.executemany("INSERT INTO usuarios (username, password, role, barbero_id) VALUES (?, ?, ?, ?)", usuarios)
+        
+        # Cargar servicios iniciales (para probar auditoría contable)
+        servicios_iniciales = [
+            (None, 1, 'Corte de pelo', 5000.0, 'Efectivo', 0.0, 0.0, 0.0, None, '2026-06-20', 1), # Aprobado
+            (None, 1, 'Corte y Barba', 7000.0, 'Transferencia', 0.0, 0.0, 0.0, None, '2026-06-21', 1), # Aprobado
+            (None, 2, 'Tintura Negra', 12000.0, 'Tarjeta', 0.0, 0.0, 50.0, 1, '2026-06-22', 0), # Pendiente
+            (None, 2, 'Corte de pelo', 5000.0, 'Efectivo', 0.0, 0.0, 0.0, None, '2026-06-23', 0) # Pendiente
+        ]
+        cursor.executemany("""
+        INSERT INTO servicios_realizados (turno_id, barbero_id, servicio_nombre, monto_cobrado, metodo_pago, descuento_aplicado, propina_digital, ml_consumidos, insumo_id, fecha, aprobado)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, servicios_iniciales)
         
         conn.commit()
         print("Datos de prueba (seed) cargados exitosamente.")

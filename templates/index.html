@@ -171,6 +171,49 @@
                     </div>
                 </div>
 
+                <!-- LIQUIDACIÓN ESTIMADA DE BARBEROS (ADMIN ONLY) -->
+                <div id="admin-estimated-payouts-card" class="detail-card hidden" style="margin-top: 32px;">
+                    <h3>Liquidación Estimada de Barberos (Junio)</h3>
+                    <p class="card-desc">Cálculo en tiempo real de lo que corresponde pagar a cada barbero según los servicios aprobados hasta el momento.</p>
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Barbero</th>
+                                <th>Monto Bruto Generado</th>
+                                <th>Comisión Aplicada</th>
+                                <th>Pago Neto (Comisión)</th>
+                                <th>Propinas Digitales</th>
+                                <th>Total a Pagar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="estimated-payouts-table-body">
+                            <!-- Carga dinámica -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- AUDITORÍA DE SERVICIOS (ADMIN ONLY) -->
+                <div id="admin-audit-card" class="detail-card hidden" style="margin-top: 32px;">
+                    <h3>Servicios Pendientes de Auditoría</h3>
+                    <p class="card-desc">Verifica y valida los montos ingresados por los barberos antes de aprobarlos para el cierre mensual.</p>
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Barbero</th>
+                                <th>Servicio</th>
+                                <th>Monto Declarado</th>
+                                <th>Método de Pago</th>
+                                <th>Insumo Usado</th>
+                                <th>Fecha</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-table-body">
+                            <!-- Carga dinámica -->
+                        </tbody>
+                    </table>
+                </div>
+
                 <!-- LISTADO DE TURNOS -->
                 <div class="detail-card" style="margin-top: 32px;">
                     <h3>Turnos Recientes Agendados</h3>

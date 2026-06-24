@@ -18,6 +18,7 @@ class TestBarberiaLogic(unittest.TestCase):
         cursor.execute("DELETE FROM servicios_realizados")
         cursor.execute("DELETE FROM amortizaciones")
         cursor.execute("DELETE FROM gastos_fijos WHERE mes_ano IN ('2026-06', '2026-07')")
+        cursor.execute("UPDATE insumos SET ml_actuales = ml_totales")
         
         # Cargar gastos fijos estándar para el test ($170,000 total)
         cursor.execute("INSERT INTO gastos_fijos (concepto, monto, mes_ano) VALUES ('Alquiler', 120000.0, '2026-06')")
@@ -40,8 +41,8 @@ class TestBarberiaLogic(unittest.TestCase):
         # Cargar cortes: $100,000 bruto total realizado por Lucas (ID 1)
         for _ in range(10):
             cursor.execute("""
-            INSERT INTO servicios_realizados (turno_id, barbero_id, servicio_nombre, monto_cobrado, metodo_pago, fecha)
-            VALUES (NULL, 1, 'Corte de pelo', 10000.0, 'Efectivo', '2026-06-15')
+            INSERT INTO servicios_realizados (turno_id, barbero_id, servicio_nombre, monto_cobrado, metodo_pago, fecha, aprobado)
+            VALUES (NULL, 1, 'Corte de pelo', 10000.0, 'Efectivo', '2026-06-15', 1)
             """)
             
         conn.commit()
@@ -73,8 +74,8 @@ class TestBarberiaLogic(unittest.TestCase):
         # Cargar cortes: $500,000 bruto total realizado por Martín (ID 2)
         for _ in range(50):
             cursor.execute("""
-            INSERT INTO servicios_realizados (turno_id, barbero_id, servicio_nombre, monto_cobrado, metodo_pago, fecha)
-            VALUES (NULL, 2, 'Corte y Barba', 10000.0, 'Efectivo', '2026-07-15')
+            INSERT INTO servicios_realizados (turno_id, barbero_id, servicio_nombre, monto_cobrado, metodo_pago, fecha, aprobado)
+            VALUES (NULL, 2, 'Corte y Barba', 10000.0, 'Efectivo', '2026-07-15', 1)
             """)
             
         conn.commit()
@@ -90,7 +91,7 @@ class TestBarberiaLogic(unittest.TestCase):
         
         # Payout de Martín (50% de 500,000 = 250,000)
         martin_report = next(b for b in report["reporte_barberos"] if b["barbero_id"] == 2)
-        self.assertEqual(martin_report["payout_neto"], 25000.0 * 10) # 250,000
+        self.assertEqual(martin_report["payout_neto"], 250000.0)
         self.assertEqual(report["retencion_local_total"], 250000.0)
 
     def test_supply_inventory_depletion(self):

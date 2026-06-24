@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 import sqlite3
+from datetime import datetime
 from database import get_connection, init_db, seed_db
 from agents_simulator import BookingAgent, FinanceAgent, SupplyAgent
 import os
@@ -39,7 +40,7 @@ def get_dashboard_data():
         
     # 2. Servicios realizados del mes corriente (Junio 2026 en el simulador)
     mes_ano = "2026-06"
-    cursor.execute("SELECT SUM(monto_cobrado) FROM servicios_realizados WHERE strftime('%Y-%m', fecha) = ?", (mes_ano,))
+    cursor.execute("SELECT SUM(monto_cobrado) FROM servicios_realizados WHERE strftime('%Y-%m', fecha) = ? AND aprobado = 1", (mes_ano,))
     caja_mensual = cursor.fetchone()[0] or 0.0
     
     # 3. Gastos fijos del mes corriente
@@ -103,7 +104,29 @@ def get_dashboard_data():
             "monto": monto
         })
         
+    cursor.execute("""
+    SELECT s.id, s.servicio_nombre, s.monto_cobrado, s.metodo_pago, s.ml_consumidos, s.insumo_id, s.fecha, b.nombre 
+    FROM servicios_realizados s 
+    JOIN barberos b ON s.barbero_id = b.id 
+    WHERE s.aprobado = 0
+    """)
+    servicios_pendientes = []
+    for s_id, s_nom, s_monto, s_pago, s_ml, s_ins_id, s_fecha, b_nom in cursor.fetchall():
+        servicios_pendientes.append({
+            "id": s_id,
+            "servicio_nombre": s_nom,
+            "monto_cobrado": s_monto,
+            "metodo_pago": s_pago,
+            "ml_consumidos": s_ml,
+            "insumo_id": s_ins_id,
+            "fecha": s_fecha,
+            "barbero_nombre": b_nom
+        })
+        
     conn.close()
+    
+    # Obtener liquidación estimada en tiempo real
+    status_estimado = finance_agent.calculate_monthly_status("2026-06")
     
     # Retornar todas las estadísticas de negocio
     return jsonify({
@@ -117,7 +140,9 @@ def get_dashboard_data():
         "alertas": alertas_list,
         "turnos_recientes": turnos_list,
         "inversion_items": inversion_items,
-        "gastos_items": gastos_items
+        "gastos_items": gastos_items,
+        "servicios_pendientes": servicios_pendientes,
+        "status_estimado": status_estimado
     })
 
 @app.route('/api/barberos')
@@ -231,6 +256,38 @@ def register_service():
         "message": "Servicio registrado exitosamente.",
         "alerta_insumo": alerta_insumo
     })
+
+@app.route('/api/servicio/aprobar/<int:srv_id>', methods=['POST'])
+def approve_service(srv_id):
+    """
+    Aprueba un servicio realizado por un barbero y opcionalmente permite corregir el monto cobrado.
+    """
+    data = request.get_json() or {}
+    monto_cobrado = data.get("monto_cobrado")
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    if monto_cobrado is not None:
+        cursor.execute("UPDATE servicios_realizados SET aprobado = 1, monto_cobrado = ? WHERE id = ?", (float(monto_cobrado), srv_id))
+    else:
+        cursor.execute("UPDATE servicios_realizados SET aprobado = 1 WHERE id = ?", (srv_id,))
+        
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Servicio auditado y aprobado."})
+
+@app.route('/api/servicio/rechazar/<int:srv_id>', methods=['POST'])
+def reject_service(srv_id):
+    """
+    Rechaza (elimina) un servicio realizado por un barbero si fue cargado incorrectamente.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM servicios_realizados WHERE id = ?", (srv_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Servicio rechazado y eliminado."})
 
 @app.route('/api/gasto', methods=['POST'])
 def register_expense():
