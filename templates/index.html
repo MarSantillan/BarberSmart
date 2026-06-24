@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartBarber Co-pilot - Dashboard Administrativo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- SIDEBAR DE NAVEGACIÓN -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <span class="logo-icon">💈</span>
+                <h2>SmartBarber</h2>
+                <span class="logo-tag">Co-pilot</span>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-btn active" onclick="switchTab('dashboard')">
+                    <span class="nav-icon">📊</span> Dashboard Contable
+                </button>
+                <button class="nav-btn" onclick="switchTab('turnos')">
+                    <span class="nav-icon">📅</span> WhatsApp Reservas
+                </button>
+                <button class="nav-btn" onclick="switchTab('cargar-servicio')">
+                    <span class="nav-icon">💇‍♂️</span> Cargar Servicios
+                </button>
+                <button class="nav-btn" onclick="switchTab('cargar-gasto')">
+                    <span class="nav-icon">💸</span> Gastos e Inversión
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <p>UTN IA - Medio Ciclo</p>
+                <span class="status-indicator">● Backend Listo</span>
+            </div>
+        </aside>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="main-content">
+            
+            <!-- ALERTAS DEL SISTEMA -->
+            <div id="system-alerts" class="alerts-container"></div>
+
+            <!-- SECCIÓN 1: DASHBOARD CONTABLE -->
+            <section id="tab-dashboard" class="tab-content active">
+                <header class="tab-header">
+                    <h1>Resumen Financiero y Amortización</h1>
+                    <p>Monitoreo en tiempo real del Punto de Equilibrio y Amortización de Capital</p>
+                </header>
+
+                <!-- KPI CARDS -->
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Inversión Inicial</span>
+                            <span class="kpi-icon">💰</span>
+                        </div>
+                        <h2 id="kpi-inversion">$0</h2>
+                        <div class="progress-bar-container">
+                            <div id="amortization-progress" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <span id="kpi-porcentaje-amortizado" class="kpi-subtext">0% Amortizado</span>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Saldo Deudor Restante</span>
+                            <span class="kpi-icon">📉</span>
+                        </div>
+                        <h2 id="kpi-saldo-pendiente" class="kpi-positive">$0</h2>
+                        <span class="kpi-subtext">Para llegar al Punto de Equilibrio</span>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Ingresos Brutos (Junio)</span>
+                            <span class="kpi-icon">💵</span>
+                        </div>
+                        <h2 id="kpi-bruto">$0</h2>
+                        <span class="kpi-subtext">Servicios realizados en el mes</span>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Gastos Operativos (Junio)</span>
+                            <span class="kpi-icon">⛽</span>
+                        </div>
+                        <h2 id="kpi-gastos" class="kpi-negative">$0</h2>
+                        <span class="kpi-subtext">Alquiler, Servicios y Tinturas</span>
+                    </div>
+                </div>
+
+                <!-- CONTENIDOS SECUNDARIOS -->
+                <div class="dashboard-details-grid">
+                    
+                    <!-- Nivel de Insumos -->
+                    <div class="detail-card">
+                        <h3>Monitoreo de Insumos (ml)</h3>
+                        <div id="insumos-stock-list" class="stock-list">
+                            <!-- Insumos cargados dinámicamente -->
+                        </div>
+                    </div>
+
+                    <!-- Amortización Mensual y Cierre -->
+                    <div class="detail-card">
+                        <h3>Cierre Mensual y Liquidación</h3>
+                        <p class="card-desc">Simula el cierre del mes para calcular comisiones dinámicas y la amortización del ROI del dueño.</p>
+                        
+                        <div class="form-group">
+                            <label for="cierre-mes">Mes de Cierre:</label>
+                            <select id="cierre-mes" class="styled-input">
+                                <option value="2026-06">Junio 2026 (Actual)</option>
+                                <option value="2026-07">Julio 2026</option>
+                            </select>
+                        </div>
+                        
+                        <button class="btn btn-primary w-full" onclick="runMonthlyClosure()">Ejecutar Cierre Contable</button>
+                        
+                        <!-- Resultado del Cierre -->
+                        <div id="closure-result" class="closure-result-box hidden">
+                            <!-- Resultados dinámicos -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LISTADO DE TURNOS -->
+                <div class="detail-card" style="margin-top: 32px;">
+                    <h3>Turnos Recientes Agendados</h3>
+                    <p class="card-desc">Turnos negociados y confirmados por el bot conversacional de WhatsApp.</p>
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Barbero</th>
+                                <th>Fecha y Hora</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="turnos-table-body">
+                            <!-- Carga dinámica -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 2: SIMULADOR WHATSAPP RESERVAS -->
+            <section id="tab-turnos" class="tab-content">
+                <header class="tab-header">
+                    <h1>Simulador de Chat de WhatsApp</h1>
+                    <p>Prueba interactiva del agente de reservas y negociación de turnos (ReAct)</p>
+                </header>
+
+                <div class="chat-simulation-container">
+                    
+                    <!-- Configuración del cliente -->
+                    <div class="chat-config-card">
+                        <h3>Configurar Cliente</h3>
+                        <div class="form-group">
+                            <label for="chat-client-name">Nombre:</label>
+                            <input type="text" id="chat-client-name" value="Martín Rodríguez" class="styled-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="chat-client-phone">Celular:</label>
+                            <input type="text" id="chat-client-phone" value="1144558822" class="styled-input">
+                        </div>
+                        
+                        <h4>Frases sugeridas para probar:</h4>
+                        <ul class="sugerencias-list">
+                            <li onclick="useSugerencia('Hola, quiero turno con Lucas el sábado a las 15')">"Hola, quiero turno con Lucas el sábado a las 15"</li>
+                            <li onclick="useSugerencia('Quiero agendar corte para el sábado a las 15:00 con Lucas')">"Quiero agendar corte para el sábado a las 15:00 con Lucas" <small>(Genera colisión)</small></li>
+                            <li onclick="useSugerencia('Hola, turno para corte el sábado con Martín a las 16 hs')">"Hola, turno para corte el sábado con Martín a las 16 hs"</li>
+                        </ul>
+                    </div>
+
+                    <!-- Pantalla del celular -->
+                    <div class="smartphone">
+                        <div class="smartphone-screen">
+                            <div class="chat-header">
+                                <span class="chat-avatar">💈</span>
+                                <div class="chat-info">
+                                    <h4>SmartBarber Bot</h4>
+                                    <span>En línea (Agente IA)</span>
+                                </div>
+                            </div>
+                            
+                            <div id="chat-messages" class="chat-messages-area">
+                                <div class="message system">Conversación iniciada con SmartBarber Bot</div>
+                                <div class="message bot">¡Hola! ¿En qué puedo ayudarte hoy? ¿Quieres reservar un corte o servicio?</div>
+                            </div>
+                            
+                            <div class="chat-input-area">
+                                <input type="text" id="chat-input-msg" placeholder="Escribe un mensaje..." onkeypress="handleChatKey(event)">
+                                <button onclick="sendChatMessage()">Enviar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 3: CARGAR SERVICIOS (BARBERO) -->
+            <section id="tab-cargar-servicio" class="tab-content">
+                <header class="tab-header">
+                    <h1>Cargar Corte o Servicio Realizado</h1>
+                    <p>Panel utilizado por los barberos para registrar ventas y consumo de mililitros de tinturas/champú</p>
+                </header>
+
+                <div class="form-card-container">
+                    <div class="form-card">
+                        <h2>Registrar Servicio</h2>
+                        
+                        <div class="form-group">
+                            <label for="srv-barbero">Barbero:</label>
+                            <select id="srv-barbero" class="styled-input"></select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="srv-nombre">Servicio Realizado:</label>
+                            <select id="srv-nombre" class="styled-input" onchange="toggleInsumoSection()">
+                                <option value="Corte de pelo">Corte de pelo ($5.000)</option>
+                                <option value="Recorte de barba">Recorte de barba ($3.000)</option>
+                                <option value="Corte y Barba">Corte y Barba ($7.000)</option>
+                                <option value="Tintura Negra">Tintura de Cabello - Negra ($12.000)</option>
+                                <option value="Tintura Castaño">Tintura de Cabello - Castaño ($12.000)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="srv-monto">Monto Efectivamente Cobrado ($):</label>
+                            <input type="number" id="srv-monto" value="5000" class="styled-input">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="srv-pago">Método de Pago:</label>
+                            <select id="srv-pago" class="styled-input">
+                                <option value="Efectivo">Efectivo (Con Descuento)</option>
+                                <option value="Transferencia">Transferencia bancaria</option>
+                                <option value="Tarjeta">Tarjeta de débito/crédito (Mercado Point)</option>
+                            </select>
+                        </div>
+
+                        <!-- Sección dinámica de Insumo líquido (ml) -->
+                        <div id="insumo-section" class="form-group hidden">
+                            <div class="insumo-alert-box">
+                                <label for="srv-insumo">Producto Fraccionado Utilizado:</label>
+                                <select id="srv-insumo" class="styled-input"></select>
+                                
+                                <label for="srv-ml" style="margin-top: 8px; display: block;">Cantidad Utilizada (ml):</label>
+                                <input type="number" id="srv-ml" value="50" class="styled-input">
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="submitService()">Registrar Servicio</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 4: GASTOS E INVERSIÓN (DUEÑO) -->
+            <section id="tab-cargar-gasto" class="tab-content">
+                <header class="tab-header">
+                    <h1>Gastos de Suministros e Inversión Inicial</h1>
+                    <p>Administración del capital inicial de apertura y gastos corrientes de insumos</p>
+                </header>
+
+                <div class="details-grid-two">
+                    
+                    <!-- Registro de Gasto Mensual -->
+                    <div class="form-card">
+                        <h2>Registrar Nuevo Gasto / Compra</h2>
+                        <p class="card-desc">Carga manual de suministros o costos operativos (Luz, Alquiler, Insumos nuevos).</p>
+                        
+                        <div class="form-group">
+                            <label for="gst-concepto">Concepto / Producto:</label>
+                            <input type="text" id="gst-concepto" placeholder="Ej. Toallas de microfibra x10" class="styled-input">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="gst-monto">Monto en Pesos ($):</label>
+                            <input type="number" id="gst-monto" placeholder="Ej. 15000" class="styled-input">
+                        </div>
+                        
+                        <button class="btn btn-primary" onclick="submitExpense()">Registrar Gasto</button>
+                    </div>
+
+                    <!-- Resumen de Inversión Inicial -->
+                    <div class="detail-card">
+                        <h2>Desglose de Inversión de Apertura</h2>
+                        <p class="card-desc">Gastos iniciales cargados para calcular la amortización del local:</p>
+                        <div class="investment-summary-list">
+                            <div class="inv-item">
+                                <span>🏗️ Infraestructura y Local</span>
+                                <strong>$150.000</strong>
+                            </div>
+                            <div class="inv-item">
+                                <span>🪑 Mobiliario (Sillones, Espejos)</span>
+                                <strong>$300.000</strong>
+                            </div>
+                            <div class="inv-item">
+                                <span>💡 Iluminación LED y Cartel</span>
+                                <strong>$80.000</strong>
+                            </div>
+                            <div class="inv-item">
+                                <span>✂️ Herramientas Profesionales</span>
+                                <strong>$120.000</strong>
+                            </div>
+                            <hr class="card-divider">
+                            <div class="inv-item total">
+                                <span>Total Inicial Acumulado</span>
+                                <strong id="total-inversion-static">$650.000</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+        </main>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+// CONTROL DE PESTAÑAS
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+    // Encontrar el botón y marcarlo como activo
+    const buttons = document.querySelectorAll('.nav-btn');
+    buttons.forEach(btn => {
+        if (btn.getAttribute('onclick').includes(tabId)) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// INICIALIZACIÓN
+window.onload = function() {
+    loadDashboard();
+    loadSelectOptions();
+};
+
+// CARGAR DATOS DEL DASHBOARD
+function loadDashboard() {
+    fetch('/api/dashboard')
+        .then(res => res.json())
+        .then(data => {
+            // Actualizar KPIs
+            document.getElementById('kpi-inversion').innerText = `$${data.inversion_total.toLocaleString('es-AR')}`;
+            document.getElementById('kpi-porcentaje-amortizado').innerText = `${data.porcentaje_retorno}% Amortizado`;
+            document.getElementById('amortization-progress').style.width = `${data.porcentaje_retorno}%`;
+            document.getElementById('kpi-saldo-pendiente').innerText = `$${data.saldo_pendiente.toLocaleString('es-AR')}`;
+            document.getElementById('kpi-bruto').innerText = `$${data.caja_mensual.toLocaleString('es-AR')}`;
+            document.getElementById('kpi-gastos').innerText = `$${data.gastos_fijos.toLocaleString('es-AR')}`;
+
+            // Actualizar Insumos
+            const stockList = document.getElementById('insumos-stock-list');
+            stockList.innerHTML = '';
+            
+            data.insumos.forEach(item => {
+                let colorClass = 'normal';
+                if (item.porcentaje <= 15) {
+                    colorClass = 'critical';
+                } else if (item.porcentaje < 50) {
+                    colorClass = 'low';
+                }
+                
+                const stockItem = document.createElement('div');
+                stockItem.className = 'stock-item';
+                stockItem.innerHTML = `
+                    <div class="stock-item-info">
+                        <span>${item.nombre}</span>
+                        <span>${item.ml_actuales} ml / ${item.ml_totales} ml (${item.porcentaje}%)</span>
+                    </div>
+                    <div class="stock-progress-bg">
+                        <div class="stock-progress-fill ${colorClass}" style="width: ${item.porcentaje}%"></div>
+                    </div>
+                `;
+                stockList.appendChild(stockItem);
+            });
+
+            // Actualizar Alertas en pantalla
+            const alertsDiv = document.getElementById('system-alerts');
+            alertsDiv.innerHTML = '';
+            data.alertas.forEach(msg => {
+                const card = document.createElement('div');
+                card.className = 'alert-card';
+                card.innerHTML = `
+                    <span>⚠️ ${msg}</span>
+                    <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+                `;
+                alertsDiv.appendChild(card);
+            });
+
+            // Actualizar Turnos Recientes
+            const turnosTable = document.getElementById('turnos-table-body');
+            if (turnosTable) {
+                turnosTable.innerHTML = '';
+                data.turnos_recientes.forEach(t => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${t.cliente_nombre}</strong></td>
+                        <td>${t.barbero_nombre}</td>
+                        <td>${t.fecha_hora} hs</td>
+                        <td><span class="status-badge ${t.estado.toLowerCase()}">${t.estado}</span></td>
+                    `;
+                    turnosTable.appendChild(tr);
+                });
+            }
+        });
+}
+
+// CARGAR SELECTORES DE FORMULARIOS
+function loadSelectOptions() {
+    // Cargar barberos
+    fetch('/api/barberos')
+        .then(res => res.json())
+        .then(data => {
+            const barberSelect = document.getElementById('srv-barbero');
+            barberSelect.innerHTML = '';
+            data.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b.id;
+                opt.innerText = b.nombre;
+                barberSelect.appendChild(opt);
+            });
+        });
+
+    // Cargar insumos
+    fetch('/api/insumos')
+        .then(res => res.json())
+        .then(data => {
+            const insumoSelect = document.getElementById('srv-insumo');
+            insumoSelect.innerHTML = '';
+            data.forEach(i => {
+                const opt = document.createElement('option');
+                opt.value = i.id;
+                opt.innerText = i.nombre;
+                insumoSelect.appendChild(opt);
+            });
+        });
+}
+
+// MOSTRAR/OCULTAR SECCIÓN DE INSUMOS SEGÚN SERVICIO
+function toggleInsumoSection() {
+    const servicio = document.getElementById('srv-nombre').value;
+    const insumoSection = document.getElementById('insumo-section');
+    const srvMonto = document.getElementById('srv-monto');
+    
+    if (servicio.includes("Tintura")) {
+        insumoSection.classList.remove('hidden');
+        srvMonto.value = 12000; // Ajustar precio estimado
+        
+        // Seleccionar automáticamente la tintura adecuada en el select
+        const insumoSelect = document.getElementById('srv-insumo');
+        if (servicio.includes("Negra")) {
+            insumoSelect.value = 1; // Tintura Negra ID 1
+        } else {
+            insumoSelect.value = 2; // Tintura Castaño ID 2
+        }
+    } else {
+        insumoSection.classList.add('hidden');
+        if (servicio === "Corte de pelo") srvMonto.value = 5000;
+        if (servicio === "Recorte de barba") srvMonto.value = 3000;
+        if (servicio === "Corte y Barba") srvMonto.value = 7000;
+    }
+}
+
+// REGISTRAR SERVICIO
+function submitService() {
+    const barbero_id = document.getElementById('srv-barbero').value;
+    const servicio_nombre = document.getElementById('srv-nombre').value;
+    const monto_cobrado = document.getElementById('srv-monto').value;
+    const metodo_pago = document.getElementById('srv-pago').value;
+    
+    const isTintura = !document.getElementById('insumo-section').classList.contains('hidden');
+    const insumo_id = isTintura ? document.getElementById('srv-insumo').value : null;
+    const ml_consumidos = isTintura ? document.getElementById('srv-ml').value : 0;
+
+    fetch('/api/servicio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            barbero_id,
+            servicio_nombre,
+            monto_cobrado,
+            metodo_pago,
+            insumo_id,
+            ml_consumidos
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message);
+        if (data.alerta_insumo) {
+            alert(data.alerta_insumo);
+        }
+        loadDashboard();
+    });
+}
+
+// REGISTRAR GASTO
+function submitExpense() {
+    const concepto = document.getElementById('gst-concepto').value;
+    const monto = document.getElementById('gst-monto').value;
+    
+    if (!concepto || !monto) {
+        alert("Por favor completa los campos del gasto.");
+        return;
+    }
+
+    fetch('/api/gasto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concepto, monto })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message);
+        document.getElementById('gst-concepto').value = '';
+        document.getElementById('gst-monto').value = '';
+        loadDashboard();
+    });
+}
+
+// EJECUTAR CIERRE MENSUAL
+function runMonthlyClosure() {
+    const mes_ano = document.getElementById('cierre-mes').value;
+    
+    fetch('/api/cierre', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes_ano })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const resultBox = document.getElementById('closure-result');
+        resultBox.classList.remove('hidden');
+        
+        let comisionHtml = '';
+        if (data.contingencia_comision_activa) {
+            resultBox.classList.add('alert-active');
+            comisionHtml = `<span style="color: var(--warning); font-weight: bold;">⚠️ Contingencia Activa: Los barberos cobraron 40% de comisiones</span> (la porción del 50% de la barbería no cubría los costos del local).`;
+        } else {
+            resultBox.classList.remove('alert-active');
+            comisionHtml = `<span style="color: var(--success); font-weight: bold;">✅ Split Estándar 50/50 Activo</span> (los ingresos cubrieron con éxito los costos del local).`;
+        }
+
+        let reporteBarberosHtml = '<ul>';
+        data.reporte_barberos.forEach(b => {
+            reporteBarberosHtml += `
+                <li><strong>${b.nombre}:</strong> Bruto generado: $${b.bruto_generado.toLocaleString('es-AR')} | Pago: $${b.payout_neto.toLocaleString('es-AR')} (${b.comision_porcentaje}%)</li>
+            `;
+        });
+        reporteBarberosHtml += '</ul>';
+
+        resultBox.innerHTML = `
+            <h4>Resultado del Cierre Contable (${data.mes_ano})</h4>
+            <p>${comisionHtml}</p>
+            <p><strong>Caja Bruta Generada:</strong> $${data.total_bruto_generado.toLocaleString('es-AR')}</p>
+            <p><strong>Gastos Totales del Local:</strong> $${data.total_gastos_local.toLocaleString('es-AR')} (Gastos Fijos: $${data.gastos_fijos.toLocaleString('es-AR')}, Insumos: $${data.gastos_insumos.toLocaleString('es-AR')})</p>
+            <p><strong>Porción Retenida por Barbería:</strong> $${data.retencion_local_total.toLocaleString('es-AR')}</p>
+            <p><strong>Ganancia Líquida del Dueño:</strong> $${data.ganancia_neta_dueno_bruta.toLocaleString('es-AR')}</p>
+            <p><strong>Monto Amortizado al ROI este mes:</strong> $${data.monto_amortizado_este_mes.toLocaleString('es-AR')}</p>
+            <p><strong>Saldo Pendiente de Inversión Inicial:</strong> $${data.saldo_pendiente_inversion.toLocaleString('es-AR')} (Recuperado el ${data.retorno_porcentaje}%)</p>
+            <h5 style="margin-top: 12px; margin-bottom: 6px; color:#fff;">Liquidación Barberos:</h5>
+            ${reporteBarberosHtml}
+        `;
+        
+        loadDashboard();
+    });
+}
+
+// SIMULADOR CHAT DE WHATSAPP
+function sendChatMessage() {
+    const input = document.getElementById('chat-input-msg');
+    const msg = input.value.trim();
+    if (!msg) return;
+    
+    const clientName = document.getElementById('chat-client-name').value;
+    const clientPhone = document.getElementById('chat-client-phone').value;
+    
+    appendMessage(msg, 'user');
+    input.value = '';
+    
+    fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: clientName,
+            phone: clientPhone,
+            message: msg
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        appendMessage(data.response, 'bot');
+    });
+}
+
+function handleChatKey(e) {
+    if (e.key === 'Enter') {
+        sendChatMessage();
+    }
+}
+
+function appendMessage(text, sender) {
+    const messagesArea = document.getElementById('chat-messages');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${sender}`;
+    msgDiv.innerText = text;
+    messagesArea.appendChild(msgDiv);
+    messagesArea.scrollTop = messagesArea.scrollHeight;
+}
+
+function useSugerencia(text) {
+    document.getElementById('chat-input-msg').value = text;
+    sendChatMessage();
+}
