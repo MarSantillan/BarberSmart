@@ -1,9 +1,74 @@
 import sqlite3
 import os
+import re
 
 DB_PATH = "barberia.db"
 
+class PostgresCursorWrapper:
+    def __init__(self, pg_cursor):
+        self.cursor = pg_cursor
+        
+    def execute(self, query, params=None):
+        # 1. Reemplazar marcadores de parámetros SQLite (?) con Postgres (%s)
+        query = query.replace('?', '%s')
+        
+        # 2. Reemplazar strftime('%Y-%m', campo) con SUBSTR(campo, 1, 7)
+        query = re.sub(r"strftime\(\s*'%Y-%m'\s*,\s*([a-zA-Z0-9_\.]+)\s*\)", r"SUBSTR(\1, 1, 7)", query)
+        
+        # 3. Reemplazar SQLite AUTOINCREMENT con Postgres SERIAL
+        query = query.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+        
+        if params is not None:
+            self.cursor.execute(query, params)
+        else:
+            self.cursor.execute(query)
+            
+    def executemany(self, query, seq_of_parameters):
+        # 1. Reemplazar marcadores (?) con (%s)
+        query = query.replace('?', '%s')
+        
+        # 2. Reemplazar strftime con SUBSTR
+        query = re.sub(r"strftime\(\s*'%Y-%m'\s*,\s*([a-zA-Z0-9_\.]+)\s*\)", r"SUBSTR(\1, 1, 7)", query)
+        
+        # 3. Reemplazar autoincremento
+        query = query.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+        
+        self.cursor.executemany(query, seq_of_parameters)
+        
+    def __getattr__(self, name):
+        return getattr(self.cursor, name)
+
+class PostgresConnectionWrapper:
+    def __init__(self, pg_conn):
+        self.conn = pg_conn
+        
+    def cursor(self):
+        return PostgresCursorWrapper(self.conn.cursor())
+        
+    def commit(self):
+        self.conn.commit()
+        
+    def rollback(self):
+        self.conn.rollback()
+        
+    def close(self):
+        self.conn.close()
+        
+    def __getattr__(self, name):
+        return getattr(self.conn, name)
+
 def get_connection():
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        try:
+            import psycopg2
+            pg_conn = psycopg2.connect(db_url)
+            return PostgresConnectionWrapper(pg_conn)
+        except ImportError:
+            print("ERROR: DATABASE_URL está configurada pero psycopg2 no está instalado en el sistema. Usando base local SQLite...")
+        except Exception as e:
+            print(f"ERROR al conectar a PostgreSQL: {e}. Cayendo en base local SQLite...")
+            
     return sqlite3.connect(DB_PATH)
 
 def init_db():
