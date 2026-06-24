@@ -38,6 +38,7 @@ function checkSession() {
     const navDashboard = document.getElementById("nav-dashboard");
     const navTurnos = document.getElementById("nav-turnos");
     const navCargarGasto = document.getElementById("nav-cargar-gasto");
+    const navAgenda = document.getElementById("nav-agenda-turnos");
     const srvBarbero = document.getElementById("srv-barbero");
     
     if (user.role === 'barber') {
@@ -45,9 +46,10 @@ function checkSession() {
         if (navDashboard) navDashboard.classList.add("hidden");
         if (navTurnos) navTurnos.classList.add("hidden");
         if (navCargarGasto) navCargarGasto.classList.add("hidden");
+        if (navAgenda) navAgenda.classList.remove("hidden");
         
-        // Cargar sólo carga de servicios
-        switchTab('cargar-servicio');
+        // Cargar por defecto la agenda de turnos propia
+        switchTab('agenda-turnos');
         
         // Bloquear el select de barberos al barbero logueado
         setTimeout(() => {
@@ -61,6 +63,7 @@ function checkSession() {
         if (navDashboard) navDashboard.classList.remove("hidden");
         if (navTurnos) navTurnos.classList.remove("hidden");
         if (navCargarGasto) navCargarGasto.classList.remove("hidden");
+        if (navAgenda) navAgenda.classList.remove("hidden");
         
         if (srvBarbero) srvBarbero.disabled = false;
         
@@ -234,6 +237,7 @@ function loadDashboard() {
                     gstList.appendChild(div);
                 });
             }
+            loadAgenda();
         });
 }
 
@@ -543,4 +547,49 @@ function appendMessage(text, sender) {
 function useSugerencia(text) {
     document.getElementById('chat-input-msg').value = text;
     sendChatMessage();
+}
+
+// CARGAR AGENDA DE TURNOS (ADMIN O FILTRADO POR BARBERO)
+function loadAgenda() {
+    const userStr = localStorage.getItem("user");
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+    
+    let url = '/api/turnos';
+    if (user.role === 'barber') {
+        url += `?barbero_id=${user.barbero_id}`;
+        const titleEl = document.getElementById("agenda-title");
+        const descEl = document.getElementById("agenda-desc");
+        if (titleEl) titleEl.innerText = "Mis Turnos Asignados";
+        if (descEl) descEl.innerText = "Listado de clientes agendados para tu atención";
+    } else {
+        const titleEl = document.getElementById("agenda-title");
+        const descEl = document.getElementById("agenda-desc");
+        if (titleEl) titleEl.innerText = "Agenda General de Turnos";
+        if (descEl) descEl.innerText = "Listado completo de reservas activas en la barbería";
+    }
+    
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            const tbody = document.getElementById("agenda-table-body");
+            if (tbody) {
+                tbody.innerHTML = '';
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding: 24px;">No hay turnos registrados en la agenda.</td></tr>`;
+                    return;
+                }
+                data.forEach(t => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td><strong>${t.cliente_nombre}</strong></td>
+                        <td>${t.cliente_telefono}</td>
+                        <td>${t.barbero_nombre}</td>
+                        <td>${t.fecha_hora} hs</td>
+                        <td><span class="status-badge ${t.estado.toLowerCase()}">${t.estado}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        });
 }

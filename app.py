@@ -138,6 +138,42 @@ def get_insumos():
     conn.close()
     return jsonify(insumos)
 
+@app.route('/api/turnos')
+def get_turnos():
+    barbero_id = request.args.get("barbero_id")
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    if barbero_id:
+        cursor.execute("""
+        SELECT t.id, t.cliente_nombre, t.cliente_telefono, t.fecha_hora, t.estado, b.nombre 
+        FROM turnos t 
+        JOIN barberos b ON t.barbero_id = b.id
+        WHERE t.barbero_id = ?
+        ORDER BY t.fecha_hora DESC
+        """, (barbero_id,))
+    else:
+        cursor.execute("""
+        SELECT t.id, t.cliente_nombre, t.cliente_telefono, t.fecha_hora, t.estado, b.nombre 
+        FROM turnos t 
+        JOIN barberos b ON t.barbero_id = b.id
+        ORDER BY t.fecha_hora DESC
+        """)
+        
+    turnos = []
+    for t_id, cli_n, cli_tel, fh, est, bar_n in cursor.fetchall():
+        turnos.append({
+            "id": t_id,
+            "cliente_nombre": cli_n,
+            "cliente_telefono": cli_tel,
+            "fecha_hora": fh,
+            "estado": est,
+            "barbero_nombre": bar_n
+        })
+        
+    conn.close()
+    return jsonify(turnos)
+
 @app.route('/api/chat', methods=['POST'])
 def process_chat():
     """

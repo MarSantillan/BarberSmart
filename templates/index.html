@@ -64,7 +64,10 @@
                     <span class="nav-icon">📊</span> Dashboard Contable
                 </button>
                 <button id="nav-turnos" class="nav-btn" onclick="switchTab('turnos')">
-                    <span class="nav-icon">📅</span> WhatsApp Reservas
+                    <span class="nav-icon">💬</span> WhatsApp Reservas
+                </button>
+                <button id="nav-agenda-turnos" class="nav-btn" onclick="switchTab('agenda-turnos')">
+                    <span class="nav-icon">📅</span> Agenda de Turnos
                 </button>
                 <button id="nav-cargar-servicio" class="nav-btn" onclick="switchTab('cargar-servicio')">
                     <span class="nav-icon">💇‍♂️</span> Cargar Servicios
@@ -386,6 +389,31 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 5: AGENDA DE TURNOS (ADMIN + BARBERO) -->
+            <section id="tab-agenda-turnos" class="tab-content">
+                <header class="tab-header">
+                    <h1 id="agenda-title">Agenda de Turnos</h1>
+                    <p id="agenda-desc">Listado completo de citas asignadas para atender</p>
+                </header>
+
+                <div class="detail-card">
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Teléfono</th>
+                                <th>Barbero Asignado</th>
+                                <th>Fecha y Hora</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agenda-table-body">
+                            <!-- Carga dinámica -->
+                        </tbody>
+                    </table>
                 </div>
             </section>
             
