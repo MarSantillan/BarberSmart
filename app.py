@@ -84,12 +84,22 @@ def get_dashboard_data():
             "barbero_nombre": bar_n
         })
         
-    cursor.execute("SELECT rubro, detalle, monto_pesos FROM inversion_inicial")
+    cursor.execute("SELECT id, rubro, detalle, monto_pesos FROM inversion_inicial")
     inversion_items = []
-    for rubro, detalle, monto in cursor.fetchall():
+    for item_id, rubro, detalle, monto in cursor.fetchall():
         inversion_items.append({
+            "id": item_id,
             "rubro": rubro,
             "detalle": detalle,
+            "monto": monto
+        })
+        
+    cursor.execute("SELECT id, concepto, monto FROM gastos_fijos WHERE mes_ano = ?", (mes_ano,))
+    gastos_items = []
+    for g_id, concepto, monto in cursor.fetchall():
+        gastos_items.append({
+            "id": g_id,
+            "concepto": concepto,
             "monto": monto
         })
         
@@ -106,7 +116,8 @@ def get_dashboard_data():
         "insumos": insumos_list,
         "alertas": alertas_list,
         "turnos_recientes": turnos_list,
-        "inversion_items": inversion_items
+        "inversion_items": inversion_items,
+        "gastos_items": gastos_items
     })
 
 @app.route('/api/barberos')
@@ -237,6 +248,82 @@ def process_closure():
     
     report = finance_agent.run_monthly_closure(mes_ano)
     return jsonify(report)
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json() or {}
+    username = data.get("username")
+    password = data.get("password")
+    
+    if not username or not password:
+        return jsonify({"status": "error", "message": "Faltan credenciales"}), 400
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, role, barbero_id FROM usuarios WHERE username = ? AND password = ?", (username, password))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        return jsonify({
+            "status": "success",
+            "username": username,
+            "role": row[1],
+            "barbero_id": row[2]
+        })
+    else:
+        return jsonify({"status": "error", "message": "Usuario o contraseña incorrectos"}), 401
+
+@app.route('/api/inversion/<int:item_id>', methods=['DELETE'])
+def delete_inversion(item_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM inversion_inicial WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Item de inversión eliminado."})
+
+@app.route('/api/inversion/<int:item_id>', methods=['PUT'])
+def update_inversion(item_id):
+    data = request.get_json() or {}
+    rubro = data.get("rubro")
+    detalle = data.get("detalle")
+    monto = float(data.get("monto", 0))
+    
+    if not rubro or not detalle or monto <= 0:
+        return jsonify({"error": "Datos inválidos"}), 400
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE inversion_inicial SET rubro = ?, detalle = ?, monto_pesos = ? WHERE id = ?", (rubro, detalle, monto, item_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Item de inversión actualizado."})
+
+@app.route('/api/gasto/<int:gasto_id>', methods=['DELETE'])
+def delete_expense(gasto_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM gastos_fijos WHERE id = ?", (gasto_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Gasto eliminado."})
+
+@app.route('/api/gasto/<int:gasto_id>', methods=['PUT'])
+def update_expense(gasto_id):
+    data = request.get_json() or {}
+    concepto = data.get("concepto")
+    monto = float(data.get("monto", 0))
+    
+    if not concepto or monto <= 0:
+        return jsonify({"error": "Datos inválidos"}), 400
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE gastos_fijos SET concepto = ?, monto = ? WHERE id = ?", (concepto, monto, gasto_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Gasto actualizado."})
 
 if __name__ == '__main__':
     # Crear carpetas estáticas si no existen

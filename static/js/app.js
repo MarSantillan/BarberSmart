@@ -8,19 +8,115 @@ function switchTab(tabId) {
     });
     
     document.getElementById(`tab-${tabId}`).classList.add('active');
-    // Encontrar el botón y marcarlo como activo
+    
     const buttons = document.querySelectorAll('.nav-btn');
     buttons.forEach(btn => {
-        if (btn.getAttribute('onclick').includes(tabId)) {
+        if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabId)) {
             btn.classList.add('active');
         }
     });
 }
 
-// INICIALIZACIÓN
-window.onload = function() {
+// CONTROL DE SESIÓN Y USUARIOS
+function checkSession() {
+    const userStr = localStorage.getItem("user");
+    const loginOverlay = document.getElementById("login-overlay");
+    
+    if (!userStr) {
+        loginOverlay.classList.remove("hidden");
+        return;
+    }
+    
+    const user = JSON.parse(userStr);
+    loginOverlay.classList.add("hidden");
+    
+    // Actualizar perfil en el Sidebar
+    document.getElementById("user-display-name").innerText = user.username.toUpperCase();
+    document.getElementById("user-display-role").innerText = user.role === 'admin' ? 'Dueño (Admin)' : 'Barbero';
+    
+    // Restringir visualización según rol
+    const navDashboard = document.getElementById("nav-dashboard");
+    const navTurnos = document.getElementById("nav-turnos");
+    const navCargarGasto = document.getElementById("nav-cargar-gasto");
+    const srvBarbero = document.getElementById("srv-barbero");
+    
+    if (user.role === 'barber') {
+        // Ocultar tabs administrativas
+        if (navDashboard) navDashboard.classList.add("hidden");
+        if (navTurnos) navTurnos.classList.add("hidden");
+        if (navCargarGasto) navCargarGasto.classList.add("hidden");
+        
+        // Cargar sólo carga de servicios
+        switchTab('cargar-servicio');
+        
+        // Bloquear el select de barberos al barbero logueado
+        setTimeout(() => {
+            if (srvBarbero) {
+                srvBarbero.value = user.barbero_id;
+                srvBarbero.disabled = true;
+            }
+        }, 500);
+    } else {
+        // Admin ve todo
+        if (navDashboard) navDashboard.classList.remove("hidden");
+        if (navTurnos) navTurnos.classList.remove("hidden");
+        if (navCargarGasto) navCargarGasto.classList.remove("hidden");
+        
+        if (srvBarbero) srvBarbero.disabled = false;
+        
+        switchTab('dashboard');
+    }
+    
+    // Cargar datos
     loadDashboard();
     loadSelectOptions();
+}
+
+function submitLogin() {
+    const username = document.getElementById("login-username").value.trim();
+    const password = document.getElementById("login-password").value.trim();
+    const errorMsg = document.getElementById("login-error");
+    
+    if (!username || !password) {
+        alert("Por favor ingresa usuario y contraseña.");
+        return;
+    }
+    
+    fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    })
+    .then(res => {
+        if (!res.ok) {
+            throw new Error("Credenciales inválidas");
+        }
+        return res.json();
+    })
+    .then(data => {
+        errorMsg.classList.add("hidden");
+        localStorage.setItem("user", JSON.stringify(data));
+        checkSession();
+    })
+    .catch(err => {
+        errorMsg.classList.remove("hidden");
+    });
+}
+
+function handleLoginKey(e) {
+    if (e.key === 'Enter') {
+        submitLogin();
+    }
+}
+
+function logout() {
+    localStorage.removeItem("user");
+    location.reload();
+}
+
+// INICIALIZACIÓN
+window.onload = function() {
+    checkSession();
 };
 
 // CARGAR DATOS DEL DASHBOARD
@@ -90,7 +186,8 @@ function loadDashboard() {
                     turnosTable.appendChild(tr);
                 });
             }
-            // Actualizar Items de Inversión Inicial
+
+            // Actualizar Items de Inversión Inicial (Dinámico con Editar/Eliminar)
             const invList = document.getElementById('inversion-items-list');
             if (invList) {
                 invList.innerHTML = '';
@@ -104,44 +201,72 @@ function loadDashboard() {
                     div.className = 'inv-item';
                     div.innerHTML = `
                         <span>${emoji} ${item.rubro} (${item.detalle})</span>
-                        <strong>$${item.monto.toLocaleString('es-AR')}</strong>
+                        <div class="list-actions">
+                            <strong style="margin-right: 8px;">$${item.monto.toLocaleString('es-AR')}</strong>
+                            <span class="action-icon edit" onclick="editInversion(${item.id}, '${item.rubro}', '${item.detalle}', ${item.monto})" title="Editar">✏️</span>
+                            <span class="action-icon delete" onclick="deleteInversion(${item.id})" title="Eliminar">❌</span>
+                        </div>
                     `;
                     invList.appendChild(div);
                 });
                 
                 document.getElementById('total-inversion-dynamic').innerText = `$${data.inversion_total.toLocaleString('es-AR')}`;
             }
+
+            // Actualizar Gastos Operativos Detallados (Dinámico con Editar/Eliminar)
+            const gstList = document.getElementById('gastos-items-list');
+            if (gstList) {
+                gstList.innerHTML = '';
+                if (data.gastos_items.length === 0) {
+                    gstList.innerHTML = `<p style="color: var(--text-muted); font-size:13px;">No hay gastos cargados en este mes.</p>`;
+                }
+                data.gastos_items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'inv-item';
+                    div.innerHTML = `
+                        <span>💸 ${item.concepto}</span>
+                        <div class="list-actions">
+                            <strong style="margin-right: 8px;">$${item.monto.toLocaleString('es-AR')}</strong>
+                            <span class="action-icon edit" onclick="editExpense(${item.id}, '${item.concepto}', ${item.monto})" title="Editar">✏️</span>
+                            <span class="action-icon delete" onclick="deleteExpense(${item.id})" title="Eliminar">❌</span>
+                        </div>
+                    `;
+                    gstList.appendChild(div);
+                });
+            }
         });
 }
 
 // CARGAR SELECTORES DE FORMULARIOS
 function loadSelectOptions() {
-    // Cargar barberos
     fetch('/api/barberos')
         .then(res => res.json())
         .then(data => {
             const barberSelect = document.getElementById('srv-barbero');
-            barberSelect.innerHTML = '';
-            data.forEach(b => {
-                const opt = document.createElement('option');
-                opt.value = b.id;
-                opt.innerText = b.nombre;
-                barberSelect.appendChild(opt);
-            });
+            if (barberSelect) {
+                barberSelect.innerHTML = '';
+                data.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.id;
+                    opt.innerText = b.nombre;
+                    barberSelect.appendChild(opt);
+                });
+            }
         });
 
-    // Cargar insumos
     fetch('/api/insumos')
         .then(res => res.json())
         .then(data => {
             const insumoSelect = document.getElementById('srv-insumo');
-            insumoSelect.innerHTML = '';
-            data.forEach(i => {
-                const opt = document.createElement('option');
-                opt.value = i.id;
-                opt.innerText = i.nombre;
-                insumoSelect.appendChild(opt);
-            });
+            if (insumoSelect) {
+                insumoSelect.innerHTML = '';
+                data.forEach(i => {
+                    const opt = document.createElement('option');
+                    opt.value = i.id;
+                    opt.innerText = i.nombre;
+                    insumoSelect.appendChild(opt);
+                });
+            }
         });
 }
 
@@ -153,14 +278,13 @@ function toggleInsumoSection() {
     
     if (servicio.includes("Tintura")) {
         insumoSection.classList.remove('hidden');
-        srvMonto.value = 12000; // Ajustar precio estimado
+        srvMonto.value = 12000;
         
-        // Seleccionar automáticamente la tintura adecuada en el select
         const insumoSelect = document.getElementById('srv-insumo');
         if (servicio.includes("Negra")) {
-            insumoSelect.value = 1; // Tintura Negra ID 1
+            insumoSelect.value = 1;
         } else {
-            insumoSelect.value = 2; // Tintura Castaño ID 2
+            insumoSelect.value = 2;
         }
     } else {
         insumoSection.classList.add('hidden');
@@ -205,7 +329,7 @@ function submitService() {
 
 // REGISTRAR GASTO
 function submitExpense() {
-    const concepto = document.getElementById('gst-concepto').value;
+    const concepto = document.getElementById('gst-concepto').value.trim();
     const monto = document.getElementById('gst-monto').value;
     
     if (!concepto || !monto) {
@@ -230,7 +354,7 @@ function submitExpense() {
 // REGISTRAR INVERSIÓN INICIAL
 function submitInversion() {
     const rubro = document.getElementById('inv-rubro').value;
-    const detalle = document.getElementById('inv-detalle').value;
+    const detalle = document.getElementById('inv-detalle').value.trim();
     const monto = document.getElementById('inv-monto').value;
     
     if (!detalle || !monto) {
@@ -248,6 +372,80 @@ function submitInversion() {
         alert(data.message);
         document.getElementById('inv-detalle').value = '';
         document.getElementById('inv-monto').value = '';
+        loadDashboard();
+    });
+}
+
+// ELIMINAR Y EDITAR INVERSIÓN
+function deleteInversion(id) {
+    if (!confirm("¿Estás seguro de que deseas eliminar este item de inversión?")) return;
+    
+    fetch(`/api/inversion/${id}`, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+            loadDashboard();
+        });
+}
+
+function editInversion(id, currentRubro, currentDetalle, currentMonto) {
+    const rubro = prompt("Modificar Rubro (Mobiliario, Infraestructura, Herramientas, Otros):", currentRubro);
+    if (rubro === null) return;
+    const detalle = prompt("Modificar Detalle del Bien:", currentDetalle);
+    if (detalle === null) return;
+    const montoStr = prompt("Modificar Monto ($):", currentMonto);
+    if (montoStr === null) return;
+    
+    const monto = parseFloat(montoStr);
+    if (!detalle.trim() || isNaN(monto) || monto <= 0) {
+        alert("Datos inválidos. No se aplicaron cambios.");
+        return;
+    }
+    
+    fetch(`/api/inversion/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rubro, detalle, monto })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message);
+        loadDashboard();
+    });
+}
+
+// ELIMINAR Y EDITAR GASTO
+function deleteExpense(id) {
+    if (!confirm("¿Estás seguro de que deseas eliminar este gasto mensual?")) return;
+    
+    fetch(`/api/gasto/${id}`, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+            loadDashboard();
+        });
+}
+
+function editExpense(id, currentConcepto, currentMonto) {
+    const concepto = prompt("Modificar Concepto del Gasto:", currentConcepto);
+    if (concepto === null) return;
+    const montoStr = prompt("Modificar Monto ($):", currentMonto);
+    if (montoStr === null) return;
+    
+    const monto = parseFloat(montoStr);
+    if (!concepto.trim() || isNaN(monto) || monto <= 0) {
+        alert("Datos inválidos. No se aplicaron cambios.");
+        return;
+    }
+    
+    fetch(`/api/gasto/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concepto, monto })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message);
         loadDashboard();
     });
 }

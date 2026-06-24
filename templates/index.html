@@ -8,6 +8,38 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- LOGIN OVERLAY -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-card">
+            <span style="font-size: 48px; display: block; text-align: center; margin-bottom: 16px;">💈</span>
+            <h2 style="text-align: center; margin-bottom: 8px;">SmartBarber Co-pilot</h2>
+            <p style="text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">Por favor inicia sesión para continuar</p>
+            
+            <div id="login-error" class="login-error-msg hidden">Usuario o contraseña incorrectos</div>
+            
+            <div class="form-group">
+                <label for="login-username">Usuario:</label>
+                <input type="text" id="login-username" placeholder="Ej. admin, lucas, martin" class="styled-input">
+            </div>
+            
+            <div class="form-group">
+                <label for="login-password">Contraseña:</label>
+                <input type="password" id="login-password" placeholder="••••••••" class="styled-input" onkeypress="handleLoginKey(event)">
+            </div>
+            
+            <button class="btn btn-primary w-full" style="margin-top: 16px;" onclick="submitLogin()">Iniciar Sesión</button>
+            
+            <div class="login-help-text">
+                <p>Cuentas demo (Usuario / Clave):</p>
+                <ul>
+                    <li>Dueño: <code>admin</code> / <code>admin123</code></li>
+                    <li>Barbero 1: <code>lucas</code> / <code>lucas123</code></li>
+                    <li>Barbero 2: <code>martin</code> / <code>martin123</code></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
     <div class="app-container">
         
         <!-- SIDEBAR DE NAVEGACIÓN -->
@@ -18,17 +50,26 @@
                 <span class="logo-tag">Co-pilot</span>
             </div>
             
+            <div id="user-profile-box" class="user-profile-box">
+                <span class="user-avatar">👤</span>
+                <div class="user-details">
+                    <h4 id="user-display-name">Administrador</h4>
+                    <span id="user-display-role">Dueño</span>
+                </div>
+                <button class="logout-btn" onclick="logout()" title="Cerrar Sesión">➔</button>
+            </div>
+            
             <nav class="nav-menu">
-                <button class="nav-btn active" onclick="switchTab('dashboard')">
+                <button id="nav-dashboard" class="nav-btn active" onclick="switchTab('dashboard')">
                     <span class="nav-icon">📊</span> Dashboard Contable
                 </button>
-                <button class="nav-btn" onclick="switchTab('turnos')">
+                <button id="nav-turnos" class="nav-btn" onclick="switchTab('turnos')">
                     <span class="nav-icon">📅</span> WhatsApp Reservas
                 </button>
-                <button class="nav-btn" onclick="switchTab('cargar-servicio')">
+                <button id="nav-cargar-servicio" class="nav-btn" onclick="switchTab('cargar-servicio')">
                     <span class="nav-icon">💇‍♂️</span> Cargar Servicios
                 </button>
-                <button class="nav-btn" onclick="switchTab('cargar-gasto')">
+                <button id="nav-cargar-gasto" class="nav-btn" onclick="switchTab('cargar-gasto')">
                     <span class="nav-icon">💸</span> Gastos e Inversión
                 </button>
             </nav>
@@ -317,18 +358,31 @@
                         </div>
                     </div>
 
-                    <!-- Resumen de Inversión Inicial Dinámico -->
-                    <div class="detail-card">
-                        <h2>Desglose de Inversión de Apertura</h2>
-                        <p class="card-desc">Bienes cargados en el inventario inicial a amortizar:</p>
-                        <div class="investment-summary-list">
-                            <div id="inversion-items-list" style="display: flex; flex-direction: column; gap: 12px;">
-                                <!-- Carga dinámica de items de inversión -->
+                    <!-- Resumen de Inversión y Gastos -->
+                    <div style="display: flex; flex-direction: column; gap: 24px;">
+                        
+                        <!-- Resumen de Inversión Inicial Dinámico -->
+                        <div class="detail-card">
+                            <h2>Desglose de Inversión de Apertura</h2>
+                            <p class="card-desc">Bienes cargados en el inventario inicial a amortizar:</p>
+                            <div class="investment-summary-list">
+                                <div id="inversion-items-list" style="display: flex; flex-direction: column; gap: 12px;">
+                                    <!-- Carga dinámica de items de inversión -->
+                                </div>
+                                <hr class="card-divider">
+                                <div class="inv-item total">
+                                    <span>Total Inicial Acumulado</span>
+                                    <strong id="total-inversion-dynamic">$0</strong>
+                                </div>
                             </div>
-                            <hr class="card-divider">
-                            <div class="inv-item total">
-                                <span>Total Inicial Acumulado</span>
-                                <strong id="total-inversion-dynamic">$0</strong>
+                        </div>
+
+                        <!-- Resumen de Gastos Mensuales Dinámico -->
+                        <div class="detail-card">
+                            <h2>Gastos Operativos Detallados</h2>
+                            <p class="card-desc">Gastos corrientes del mes en curso:</p>
+                            <div id="gastos-items-list" style="display: flex; flex-direction: column; gap: 12px;">
+                                <!-- Carga dinámica de gastos -->
                             </div>
                         </div>
                     </div>

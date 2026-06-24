@@ -95,6 +95,18 @@ def init_db():
     )
     """)
     
+    # 8. Tabla de usuarios para roles
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL, -- admin, barber
+        barbero_id INTEGER,
+        FOREIGN KEY (barbero_id) REFERENCES barberos (id)
+    )
+    """)
+    
     conn.commit()
     conn.close()
     print("Base de datos inicializada correctamente.")
@@ -135,6 +147,14 @@ def seed_db():
             ('Suscripción internet y telefonía', 15000.0, '2026-06')
         ]
         cursor.executemany("INSERT INTO gastos_fijos (concepto, monto, mes_ano) VALUES (?, ?, ?)", gastos)
+        
+        # Cargar usuarios
+        usuarios = [
+            ('admin', 'admin123', 'admin', None),
+            ('lucas', 'lucas123', 'barber', 1),
+            ('martin', 'martin123', 'barber', 2)
+        ]
+        cursor.executemany("INSERT INTO usuarios (username, password, role, barbero_id) VALUES (?, ?, ?, ?)", usuarios)
         
         conn.commit()
         print("Datos de prueba (seed) cargados exitosamente.")

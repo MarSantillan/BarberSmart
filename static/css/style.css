@@ -691,3 +691,135 @@ body {
     color: var(--danger);
 }
 
+/* LOGIN OVERLAY */
+.login-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(11, 15, 25, 0.95);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.3s ease;
+}
+
+.login-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 40px;
+    width: 420px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.login-error-msg {
+    background-color: rgba(239, 68, 68, 0.15);
+    border: 1px solid var(--danger);
+    color: #fecaca;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.login-help-text {
+    margin-top: 24px;
+    border-top: 1px solid var(--card-border);
+    padding-top: 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.login-help-text ul {
+    margin-top: 8px;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.login-help-text code {
+    background-color: var(--bg-dark);
+    padding: 2px 4px;
+    border-radius: 3px;
+    color: var(--accent);
+}
+
+/* USER PROFILE BOX (SIDEBAR) */
+.user-profile-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 24px;
+}
+
+.user-avatar {
+    font-size: 24px;
+}
+
+.user-details {
+    flex-grow: 1;
+}
+
+.user-details h4 {
+    font-size: 14px;
+    color: #fff;
+    font-weight: 600;
+}
+
+.user-details span {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.logout-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.logout-btn:hover {
+    color: var(--danger);
+}
+
+/* ACCIONES DE LISTADO (EDITAR/ELIMINAR) */
+.list-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.action-icon {
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.action-icon:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.action-icon.edit:hover {
+    color: var(--accent);
+}
+
+.action-icon.delete:hover {
+    color: var(--danger);
+}
+
+
