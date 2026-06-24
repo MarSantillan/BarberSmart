@@ -18,7 +18,9 @@ class TestBarberiaLogic(unittest.TestCase):
         cursor.execute("DELETE FROM servicios_realizados")
         cursor.execute("DELETE FROM amortizaciones")
         cursor.execute("DELETE FROM gastos_fijos WHERE mes_ano IN ('2026-06', '2026-07')")
-        cursor.execute("UPDATE insumos SET ml_actuales = ml_totales")
+        cursor.execute("UPDATE insumos SET ml_totales = 250.0, ml_actuales = 250.0 WHERE id IN (1, 2)")
+        cursor.execute("UPDATE insumos SET ml_totales = 1000.0, ml_actuales = 1000.0 WHERE id = 3")
+        cursor.execute("UPDATE insumos SET ml_totales = 500.0, ml_actuales = 500.0 WHERE id = 4")
         
         # Cargar gastos fijos estándar para el test ($170,000 total)
         cursor.execute("INSERT INTO gastos_fijos (concepto, monto, mes_ano) VALUES ('Alquiler', 120000.0, '2026-06')")
@@ -117,6 +119,45 @@ class TestBarberiaLogic(unittest.TestCase):
         result_alerta = supply_agent.record_service_supplies(1, 180.0)
         self.assertTrue(result_alerta["alerta_bajo_stock"], "Debería dispararse la alerta de bajo stock")
         self.assertIsNotNone(result_alerta["alerta_mensaje"])
+
+    def test_insumo_replenishment_and_expense_logging(self):
+        """
+        Caso 4: Validar que al reponer stock de un insumo con un pack, los ml aumentan
+        y se registra un nuevo gasto en gastos_fijos.
+        """
+        supply_agent = SupplyAgent()
+        
+        # Obtener stock inicial
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT ml_actuales, ml_totales FROM insumos WHERE id = 1")
+        ml_act_inicial, ml_tot_inicial = cursor.fetchone()
+        conn.close()
+        
+        # Reponer: 4 unidades de 250ml cada una, costo $16,000
+        res = supply_agent.replenish_supply(1, 4, 250.0, 16000.0)
+        
+        self.assertEqual(res["status"], "success")
+        self.assertEqual(res["ml_agregados"], 1000.0)
+        self.assertEqual(res["ml_actuales"], ml_act_inicial + 1000.0)
+        self.assertEqual(res["ml_totales"], ml_tot_inicial + 1000.0)
+        self.assertEqual(res["monto_gasto"], 16000.0)
+        
+        # Verificar en base de datos
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT ml_actuales, ml_totales FROM insumos WHERE id = 1")
+        ml_act_final, ml_tot_final = cursor.fetchone()
+        
+        cursor.execute("SELECT concepto, monto FROM gastos_fijos WHERE concepto LIKE '%Tintura Negra%'")
+        gasto = cursor.fetchone()
+        conn.close()
+        
+        self.assertEqual(ml_act_final, ml_act_inicial + 1000.0)
+        self.assertEqual(ml_tot_final, ml_tot_inicial + 1000.0)
+        self.assertIsNotNone(gasto)
+        self.assertEqual(gasto[1], 16000.0)
+
 
 if __name__ == '__main__':
     unittest.main()

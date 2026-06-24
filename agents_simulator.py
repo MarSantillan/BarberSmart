@@ -320,6 +320,58 @@ class SupplyAgent:
     def __init__(self):
         pass
 
+    def replenish_supply(self, insumo_id, unidades, ml_por_unidad, precio_total):
+        """
+        Incrementa la cantidad de mililitros (tanto actual como total para conservar el ratio)
+        y registra el gasto correspondiente de forma automática.
+        """
+        if not insumo_id or unidades <= 0 or ml_por_unidad <= 0 or precio_total <= 0:
+            return {"error": "Datos inválidos"}
+            
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT nombre FROM insumos WHERE id = ?", (insumo_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return {"error": "Insumo no encontrado"}
+            
+        nombre = row[0]
+        ml_agregados = unidades * ml_por_unidad
+        
+        # Actualizar stock en BD (ml_actuales y ml_totales)
+        cursor.execute("""
+            UPDATE insumos 
+            SET ml_actuales = ml_actuales + ?, ml_totales = ml_totales + ? 
+            WHERE id = ?
+        """, (ml_agregados, ml_agregados, insumo_id))
+        
+        # Registrar automáticamente el gasto fijo en gastos_fijos
+        concepto = f"Reposición: {nombre} x{unidades}"
+        mes_ano = datetime.now().strftime("%Y-%m")
+        cursor.execute("""
+            INSERT INTO gastos_fijos (concepto, monto, mes_ano) 
+            VALUES (?, ?, ?)
+        """, (concepto, precio_total, mes_ano))
+        
+        conn.commit()
+        
+        # Obtener estado actualizado
+        cursor.execute("SELECT ml_actuales, ml_totales FROM insumos WHERE id = ?", (insumo_id,))
+        ml_act, ml_tot = cursor.fetchone()
+        conn.close()
+        
+        return {
+            "status": "success",
+            "nombre": nombre,
+            "ml_agregados": ml_agregados,
+            "ml_actuales": ml_act,
+            "ml_totales": ml_tot,
+            "monto_gasto": precio_total,
+            "concepto": concepto
+        }
+
     def record_service_supplies(self, insumo_id, ml_usados):
         """
         Resta la cantidad de mililitros utilizados del inventario.

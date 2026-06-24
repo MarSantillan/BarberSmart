@@ -178,10 +178,36 @@ def get_barberos():
 def get_insumos():
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, nombre FROM insumos")
-    insumos = [{"id": r[0], "nombre": r[1]} for r in cursor.fetchall()]
+    cursor.execute("SELECT id, nombre, ml_totales, ml_actuales FROM insumos")
+    insumos = [{"id": r[0], "nombre": r[1], "ml_totales": r[2], "ml_actuales": r[3]} for r in cursor.fetchall()]
     conn.close()
     return jsonify(insumos)
+
+@app.route('/api/insumo/reponer', methods=['POST'])
+def replenish_supply_route():
+    data = request.get_json() or {}
+    insumo_id = data.get("insumo_id")
+    unidades = data.get("unidades")
+    ml_por_unidad = data.get("ml_por_unidad")
+    precio_total = data.get("precio_total")
+    
+    if not insumo_id or not unidades or not ml_por_unidad or not precio_total:
+        return jsonify({"error": "Faltan datos requeridos para la reposición."}), 400
+        
+    try:
+        insumo_id = int(insumo_id)
+        unidades = int(unidades)
+        ml_por_unidad = float(ml_por_unidad)
+        precio_total = float(precio_total)
+    except ValueError:
+        return jsonify({"error": "Tipos de datos inválidos."}), 400
+        
+    res = supply_agent.replenish_supply(insumo_id, unidades, ml_por_unidad, precio_total)
+    if "error" in res:
+        return jsonify(res), 400
+        
+    return jsonify(res)
+
 
 @app.route('/api/turnos')
 def get_turnos():

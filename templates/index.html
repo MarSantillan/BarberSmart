@@ -6,6 +6,7 @@
     <title>SmartBarber Co-pilot - Dashboard Administrativo</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <!-- LOGIN OVERLAY -->
@@ -135,6 +136,22 @@
                         </div>
                         <h2 id="kpi-gastos" class="kpi-negative">$0</h2>
                         <span class="kpi-subtext">Alquiler, Servicios y Tinturas</span>
+                    </div>
+                </div>
+
+                <!-- GRÁFICOS CONTABLES -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>📊 Balance Mensual (Ingresos vs Gastos)</h3>
+                        <div class="chart-container">
+                            <canvas id="chart-balance"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>🔄 Retorno de Inversión (Amortización)</h3>
+                        <div class="chart-container">
+                            <canvas id="chart-roi"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -443,6 +460,36 @@
                             </div>
                             
                             <button class="btn btn-primary w-full" onclick="submitInversion()">Registrar Inversión Inicial</button>
+                        </div>
+
+                        <!-- Reponer Insumo (Pack) -->
+                        <div class="form-card">
+                            <h2>Reponer Insumo (Compra por Packs)</h2>
+                            <p class="card-desc">Registra la compra de insumos en packs/cajas/botellas, incrementando el stock (ml) y registrando el gasto correspondiente en forma automática.</p>
+                            
+                            <div class="form-group">
+                                <label for="rep-insumo">Seleccionar Insumo:</label>
+                                <select id="rep-insumo" class="styled-input" onchange="onInsumoChange()">
+                                    <!-- Carga dinámica -->
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="rep-unidades">Cantidad de Unidades (packs/cajas/botellas):</label>
+                                <input type="number" id="rep-unidades" placeholder="Ej. 4" class="styled-input" min="1" value="1">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="rep-ml-unidad">Contenido Unitario (ml por unidad):</label>
+                                <input type="number" id="rep-ml-unidad" placeholder="Ej. 250" class="styled-input" min="1">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="rep-precio-total">Precio Total Pagado ($):</label>
+                                <input type="number" id="rep-precio-total" placeholder="Ej. 16000" class="styled-input" min="1">
+                            </div>
+                            
+                            <button class="btn btn-primary w-full" onclick="submitReplenishment()">Registrar Reposición</button>
                         </div>
                     </div>
 

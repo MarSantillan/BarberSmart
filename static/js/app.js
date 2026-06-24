@@ -1,3 +1,6 @@
+let balanceChart = null;
+let roiChart = null;
+
 // CONTROL DE PESTAÑAS
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(tab => {
@@ -355,6 +358,7 @@ function loadDashboard() {
                     gstList.appendChild(div);
                 });
             }
+            updateCharts(data);
             loadAgenda();
         })
         .catch(err => {
@@ -382,6 +386,8 @@ function loadSelectOptions() {
     fetch('/api/insumos')
         .then(res => res.json())
         .then(data => {
+            window.insumosData = data; // Guardar en caché global
+            
             const insumoSelect = document.getElementById('srv-insumo');
             if (insumoSelect) {
                 insumoSelect.innerHTML = '';
@@ -391,6 +397,18 @@ function loadSelectOptions() {
                     opt.innerText = i.nombre;
                     insumoSelect.appendChild(opt);
                 });
+            }
+
+            const repSelect = document.getElementById('rep-insumo');
+            if (repSelect) {
+                repSelect.innerHTML = '';
+                data.forEach(i => {
+                    const opt = document.createElement('option');
+                    opt.value = i.id;
+                    opt.innerText = i.nombre;
+                    repSelect.appendChild(opt);
+                });
+                onInsumoChange(); // Autocompletar primer elemento
             }
         });
 }
@@ -909,4 +927,189 @@ function loadBarberServices(barberoId) {
         .catch(err => {
             console.error("Error al cargar servicios del barbero:", err);
         });
+}
+
+// AUTOCOMPLETAR CAPACIDAD DE INSUMO AL SELECCIONAR
+function onInsumoChange() {
+    const select = document.getElementById('rep-insumo');
+    const inputMl = document.getElementById('rep-ml-unidad');
+    if (!select || !inputMl || !window.insumosData) return;
+    
+    const selectedId = parseInt(select.value);
+    const insumo = window.insumosData.find(i => i.id === selectedId);
+    if (insumo) {
+        const nombre = insumo.nombre.toLowerCase();
+        if (nombre.includes("tintura")) {
+            inputMl.value = 250;
+        } else if (nombre.includes("champú") || nombre.includes("champu")) {
+            inputMl.value = 1000;
+        } else if (nombre.includes("loción") || nombre.includes("locion")) {
+            inputMl.value = 500;
+        } else {
+            inputMl.value = 250; // Fallback por defecto
+        }
+    }
+}
+
+// ENVIAR REPOSICIÓN DE INSUMOS
+function submitReplenishment() {
+    const insumo_id = document.getElementById('rep-insumo').value;
+    const unidades = document.getElementById('rep-unidades').value;
+    const ml_por_unidad = document.getElementById('rep-ml-unidad').value;
+    const precio_total = document.getElementById('rep-precio-total').value;
+
+    if (!insumo_id || !unidades || !ml_por_unidad || !precio_total) {
+        alert("Por favor completa todos los campos del formulario de reposición.");
+        return;
+    }
+
+    if (parseInt(unidades) <= 0 || parseFloat(ml_por_unidad) <= 0 || parseFloat(precio_total) <= 0) {
+        alert("Los valores de unidades, mililitros y precio deben ser mayores a cero.");
+        return;
+    }
+
+    fetch('/api/insumo/reponer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            insumo_id,
+            unidades,
+            ml_por_unidad,
+            precio_total
+        })
+    })
+    .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Error en la reposición");
+        
+        alert(data.message);
+        
+        // Limpiar inputs
+        document.getElementById('rep-unidades').value = 1;
+        document.getElementById('rep-ml-unidad').value = '';
+        document.getElementById('rep-precio-total').value = '';
+        
+        // Recargar Dashboard y actualizar selectores
+        loadDashboard();
+        loadSelectOptions();
+    })
+    .catch(err => {
+        alert("Error al registrar reposición: " + err.message);
+        console.error(err);
+    });
+}
+
+// DIBUJAR GRÁFICOS CONTABLES CON CHART.JS
+function updateCharts(data) {
+    const ctxBalance = document.getElementById('chart-balance');
+    const ctxRoi = document.getElementById('chart-roi');
+
+    if (!ctxBalance || !ctxRoi) return;
+
+    // Destruir gráficos anteriores si existen
+    if (balanceChart) balanceChart.destroy();
+    if (roiChart) roiChart.destroy();
+
+    // 1. Gráfico de Balance (Barra Comparativa)
+    const bruto = data.caja_mensual;
+    const fijos = data.status_estimado ? data.status_estimado.gastos_fijos : data.gastos_fijos;
+    const insumos = data.status_estimado ? data.status_estimado.gastos_insumos : 0;
+    const totalGastos = fijos + insumos;
+
+    balanceChart = new Chart(ctxBalance, {
+        type: 'bar',
+        data: {
+            labels: ['Ingresos Brutos', 'Gastos Fijos', 'Costo Insumos', 'Total Gastos'],
+            datasets: [{
+                label: 'Monto ($)',
+                data: [bruto, fijos, insumos, totalGastos],
+                backgroundColor: [
+                    'rgba(16, 185, 129, 0.6)', // success (green)
+                    'rgba(245, 158, 11, 0.6)', // warning (orange)
+                    'rgba(6, 182, 212, 0.6)',  // accent (cyan)
+                    'rgba(239, 68, 68, 0.6)'    // danger (red)
+                ],
+                borderColor: [
+                    '#10b981',
+                    '#f59e0b',
+                    '#06b6d4',
+                    '#ef4444'
+                ],
+                borderWidth: 1.5,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return ` $${context.raw.toLocaleString('es-AR')}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: {
+                        color: '#9ca3af',
+                        callback: function(value) { return '$' + value.toLocaleString('es-AR'); }
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#9ca3af' }
+                }
+            }
+        }
+    });
+
+    // 2. Gráfico de ROI (Dona Interactiva)
+    const amortizado = data.total_amortizado;
+    const pendiente = data.saldo_pendiente;
+
+    roiChart = new Chart(ctxRoi, {
+        type: 'doughnut',
+        data: {
+            labels: ['Capital Amortizado', 'Capital Pendiente'],
+            datasets: [{
+                data: [amortizado, pendiente],
+                backgroundColor: [
+                    'rgba(16, 185, 129, 0.6)', // success (green)
+                    'rgba(239, 68, 68, 0.6)'    // danger (red)
+                ],
+                borderColor: [
+                    '#10b981',
+                    '#ef4444'
+                ],
+                borderWidth: 1.5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#9ca3af', padding: 16 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const val = context.raw;
+                            const total = amortizado + pendiente;
+                            const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                            return ` $${val.toLocaleString('es-AR')} (${pct}%)`;
+                        }
+                    }
+                }
+            },
+            cutout: '65%'
+        }
+    });
 }
