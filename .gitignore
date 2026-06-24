@@ -18,3 +18,14 @@ env/
 .vscode/
 .idea/
 .DS_Store
+
+# --- ARCHIVOS ACADÉMICOS (TP) EXCLUIDOS ---
+U01_Teoria.pdf
+U02_Theory.pdf
+U03_Theory.pdf
+Entrega medio curso.docx
+Propuesta_Barberia_IA.md
+Propuesta_Barberia_IA.docx
+barber_agent_architecture.png
+barber_dashboard_mockup.png
+walkthrough.md

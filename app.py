@@ -84,6 +84,15 @@ def get_dashboard_data():
             "barbero_nombre": bar_n
         })
         
+    cursor.execute("SELECT rubro, detalle, monto_pesos FROM inversion_inicial")
+    inversion_items = []
+    for rubro, detalle, monto in cursor.fetchall():
+        inversion_items.append({
+            "rubro": rubro,
+            "detalle": detalle,
+            "monto": monto
+        })
+        
     conn.close()
     
     # Retornar todas las estadísticas de negocio
@@ -96,7 +105,8 @@ def get_dashboard_data():
         "gastos_fijos": gastos_fijos,
         "insumos": insumos_list,
         "alertas": alertas_list,
-        "turnos_recientes": turnos_list
+        "turnos_recientes": turnos_list,
+        "inversion_items": inversion_items
     })
 
 @app.route('/api/barberos')
@@ -195,6 +205,27 @@ def register_expense():
     conn.close()
     
     return jsonify({"status": "success", "message": "Gasto registrado exitosamente."})
+
+@app.route('/api/inversion', methods=['POST'])
+def register_inversion():
+    """
+    Registro manual de un item de la inversión inicial
+    """
+    data = request.get_json() or {}
+    rubro = data.get("rubro")
+    detalle = data.get("detalle")
+    monto = float(data.get("monto", 0))
+    
+    if not rubro or not detalle or monto <= 0:
+        return jsonify({"error": "Datos inválidos"}), 400
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO inversion_inicial (rubro, detalle, monto_pesos) VALUES (?, ?, ?)", (rubro, detalle, monto))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({"status": "success", "message": "Inversión inicial registrada exitosamente."})
 
 @app.route('/api/cierre', methods=['POST'])
 def process_closure():

@@ -267,49 +267,68 @@
 
                 <div class="details-grid-two">
                     
-                    <!-- Registro de Gasto Mensual -->
-                    <div class="form-card">
-                        <h2>Registrar Nuevo Gasto / Compra</h2>
-                        <p class="card-desc">Carga manual de suministros o costos operativos (Luz, Alquiler, Insumos nuevos).</p>
+                    <!-- Formularios de Registro -->
+                    <div style="display: flex; flex-direction: column; gap: 24px;">
                         
-                        <div class="form-group">
-                            <label for="gst-concepto">Concepto / Producto:</label>
-                            <input type="text" id="gst-concepto" placeholder="Ej. Toallas de microfibra x10" class="styled-input">
+                        <!-- Registro de Gasto Mensual -->
+                        <div class="form-card">
+                            <h2>Registrar Nuevo Gasto Operativo (Mensual)</h2>
+                            <p class="card-desc">Gastos corrientes del mes actual (alquiler, servicios, café, internet, etc.).</p>
+                            
+                            <div class="form-group">
+                                <label for="gst-concepto">Concepto / Descripción del Gasto:</label>
+                                <input type="text" id="gst-concepto" placeholder="Ej. Pago de Luz o Compra de Toallas" class="styled-input">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="gst-monto">Monto en Pesos ($):</label>
+                                <input type="number" id="gst-monto" placeholder="Ej. 35000" class="styled-input">
+                            </div>
+                            
+                            <button class="btn btn-primary w-full" onclick="submitExpense()">Registrar Gasto Mensual</button>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="gst-monto">Monto en Pesos ($):</label>
-                            <input type="number" id="gst-monto" placeholder="Ej. 15000" class="styled-input">
+
+                        <!-- Registro de Inversión Inicial -->
+                        <div class="form-card">
+                            <h2>Registrar Item de Inversión Inicial</h2>
+                            <p class="card-desc">Bienes comprados para el armado inicial (sillones, herramientas, cartelería) a ser amortizados.</p>
+                            
+                            <div class="form-group">
+                                <label for="inv-rubro">Rubro / Categoría:</label>
+                                <select id="inv-rubro" class="styled-input">
+                                    <option value="Mobiliario">Mobiliario</option>
+                                    <option value="Infraestructura">Infraestructura</option>
+                                    <option value="Herramientas">Herramientas</option>
+                                    <option value="Otros">Otros</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="inv-detalle">Detalle del Bien:</label>
+                                <input type="text" id="inv-detalle" placeholder="Ej. Sillón lavacabezas o Tijera profesional" class="styled-input">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="inv-monto">Monto en Pesos ($):</label>
+                                <input type="number" id="inv-monto" placeholder="Ej. 85000" class="styled-input">
+                            </div>
+                            
+                            <button class="btn btn-primary w-full" onclick="submitInversion()">Registrar Inversión Inicial</button>
                         </div>
-                        
-                        <button class="btn btn-primary" onclick="submitExpense()">Registrar Gasto</button>
                     </div>
 
-                    <!-- Resumen de Inversión Inicial -->
+                    <!-- Resumen de Inversión Inicial Dinámico -->
                     <div class="detail-card">
                         <h2>Desglose de Inversión de Apertura</h2>
-                        <p class="card-desc">Gastos iniciales cargados para calcular la amortización del local:</p>
+                        <p class="card-desc">Bienes cargados en el inventario inicial a amortizar:</p>
                         <div class="investment-summary-list">
-                            <div class="inv-item">
-                                <span>🏗️ Infraestructura y Local</span>
-                                <strong>$150.000</strong>
-                            </div>
-                            <div class="inv-item">
-                                <span>🪑 Mobiliario (Sillones, Espejos)</span>
-                                <strong>$300.000</strong>
-                            </div>
-                            <div class="inv-item">
-                                <span>💡 Iluminación LED y Cartel</span>
-                                <strong>$80.000</strong>
-                            </div>
-                            <div class="inv-item">
-                                <span>✂️ Herramientas Profesionales</span>
-                                <strong>$120.000</strong>
+                            <div id="inversion-items-list" style="display: flex; flex-direction: column; gap: 12px;">
+                                <!-- Carga dinámica de items de inversión -->
                             </div>
                             <hr class="card-divider">
                             <div class="inv-item total">
                                 <span>Total Inicial Acumulado</span>
-                                <strong id="total-inversion-static">$650.000</strong>
+                                <strong id="total-inversion-dynamic">$0</strong>
                             </div>
                         </div>
                     </div>

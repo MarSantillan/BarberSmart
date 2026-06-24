@@ -90,6 +90,27 @@ function loadDashboard() {
                     turnosTable.appendChild(tr);
                 });
             }
+            // Actualizar Items de Inversión Inicial
+            const invList = document.getElementById('inversion-items-list');
+            if (invList) {
+                invList.innerHTML = '';
+                data.inversion_items.forEach(item => {
+                    let emoji = '📦';
+                    if (item.rubro === 'Mobiliario') emoji = '🪑';
+                    else if (item.rubro === 'Infraestructura') emoji = '🏗️';
+                    else if (item.rubro === 'Herramientas') emoji = '✂️';
+                    
+                    const div = document.createElement('div');
+                    div.className = 'inv-item';
+                    div.innerHTML = `
+                        <span>${emoji} ${item.rubro} (${item.detalle})</span>
+                        <strong>$${item.monto.toLocaleString('es-AR')}</strong>
+                    `;
+                    invList.appendChild(div);
+                });
+                
+                document.getElementById('total-inversion-dynamic').innerText = `$${data.inversion_total.toLocaleString('es-AR')}`;
+            }
         });
 }
 
@@ -202,6 +223,31 @@ function submitExpense() {
         alert(data.message);
         document.getElementById('gst-concepto').value = '';
         document.getElementById('gst-monto').value = '';
+        loadDashboard();
+    });
+}
+
+// REGISTRAR INVERSIÓN INICIAL
+function submitInversion() {
+    const rubro = document.getElementById('inv-rubro').value;
+    const detalle = document.getElementById('inv-detalle').value;
+    const monto = document.getElementById('inv-monto').value;
+    
+    if (!detalle || !monto) {
+        alert("Por favor completa los campos del item de inversión.");
+        return;
+    }
+
+    fetch('/api/inversion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rubro, detalle, monto })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message);
+        document.getElementById('inv-detalle').value = '';
+        document.getElementById('inv-monto').value = '';
         loadDashboard();
     });
 }
