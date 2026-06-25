@@ -51,21 +51,31 @@ class BookingAgent:
         if match_time:
             hour = int(match_time.group(1))
             minute = int(match_time.group(2))
-            return f"{hour:02d}:{minute:02d}"
+            if 0 <= hour <= 23:
+                return f"{hour:02d}:{minute:02d}"
             
         # Formato HH hs o a las HH
         match_hour = re.search(r"(?:a las|a las\s|\s)(\d{1,2})\s*(?:hs|horas|hora|am|pm)?", text)
         if match_hour:
             hour = int(match_hour.group(1))
-            if 8 <= hour <= 21:
+            if 0 <= hour <= 23:
                 return f"{hour:02d}:00"
                 
-        # Buscar un número suelto entre 8 y 20
-        match_number = re.search(r"\b(8|9|10|11|12|13|14|15|16|17|18|19|20)\b", text)
+        # Buscar un número suelto entre 9 y 21 (horas de atención típicas) para evitar colisiones con menús numéricos
+        match_number = re.search(r"\b(9|10|11|12|13|14|15|16|17|18|19|20|21)\b", text)
         if match_number:
             return f"{int(match_number.group(1)):02d}:00"
             
         return None
+
+    def is_within_business_hours(self, time_str):
+        if not time_str:
+            return False
+        try:
+            hour = int(time_str.split(':')[0])
+            return 9 <= hour < 21
+        except Exception:
+            return False
 
     def parse_servicio(self, text):
         text = text.lower()
@@ -234,6 +244,16 @@ class BookingAgent:
         new_date = self.parse_date(message_lower)
         new_time = self.parse_time(message_lower)
         
+        # Validar si el horario está fuera de atención comercial (9 hs a 21 hs)
+        if new_time and not self.is_within_business_hours(new_time):
+            state["hora"] = None
+            state["state"] = "AWAITING_INFO"
+            self.save_chat_state(client_phone, state)
+            return {
+                "status": "awaiting_info",
+                "response": "Disculpa, la barbería se encuentra cerrada a esa hora. Nuestro horario de atención es de 09:00 hs a 21:00 hs. Por favor indica otro horario."
+            }
+            
         # Lógica en base al estado de la conversación
         if state["state"] == "AWAITING_CONFIRMATION":
             # Si el usuario responde afirmativamente
