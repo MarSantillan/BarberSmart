@@ -26,6 +26,21 @@ function switchTab(tabId) {
         sidebar.classList.remove('open');
         if (backdrop) backdrop.classList.remove('active');
     }
+
+    // Refrescar vistas dinámicamente al cambiar de pestaña
+    if (tabId === 'agenda-turnos') {
+        loadAgenda();
+    } else if (tabId === 'cargar-servicio') {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+            const user = JSON.parse(userStr);
+            if (user.role === 'barber') {
+                loadBarberServices(user.barbero_id);
+            }
+        }
+    } else if (tabId === 'dashboard') {
+        loadDashboard();
+    }
 }
 
 // CONTROL DE SESIÓN Y USUARIOS
@@ -144,6 +159,15 @@ function loadDashboard() {
     const userStr = localStorage.getItem("user");
     if (!userStr) return;
     const user = JSON.parse(userStr);
+
+    if (user.role === 'barber') {
+        // Para barberos, cargar únicamente sus servicios y agenda asignada (evitando fugas contables de la administración)
+        const barberServicesCard = document.getElementById('barber-services-card');
+        if (barberServicesCard) barberServicesCard.classList.remove('hidden');
+        loadBarberServices(user.barbero_id);
+        loadAgenda();
+        return;
+    }
 
     fetch('/api/dashboard')
         .then(res => {
