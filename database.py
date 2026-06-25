@@ -173,6 +173,20 @@ def init_db():
     )
     """)
     
+    # 9. Tabla de estados de chat para reservas
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS chat_states (
+        phone TEXT PRIMARY KEY,
+        state TEXT NOT NULL,
+        cliente_nombre TEXT,
+        barbero_id INTEGER,
+        servicio_nombre TEXT,
+        fecha TEXT,
+        hora TEXT,
+        updated_at TEXT
+    )
+    """)
+    
     conn.commit()
     conn.close()
     print("Base de datos inicializada correctamente.")

@@ -535,6 +535,17 @@ def delete_expense(gasto_id):
     conn.close()
     return jsonify({"status": "success", "message": "Gasto eliminado."})
 
+@app.route('/api/turno/<int:turno_id>', methods=['DELETE'])
+def delete_turno(turno_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    # Desvincular de servicios_realizados para evitar violaciones de clave foránea en Postgres
+    cursor.execute("UPDATE servicios_realizados SET turno_id = NULL WHERE turno_id = ?", (turno_id,))
+    cursor.execute("DELETE FROM turnos WHERE id = ?", (turno_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Turno eliminado de la agenda."})
+
 @app.route('/api/gasto/<int:gasto_id>', methods=['PUT'])
 def update_expense(gasto_id):
     data = request.get_json() or {}

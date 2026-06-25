@@ -777,6 +777,16 @@ function loadAgenda() {
     if (!userStr) return;
     const user = JSON.parse(userStr);
     
+    const actionsHeader = document.getElementById("agenda-actions-header");
+    const isAdmin = user.role === 'admin';
+    if (actionsHeader) {
+        if (isAdmin) {
+            actionsHeader.classList.remove("hidden");
+        } else {
+            actionsHeader.classList.add("hidden");
+        }
+    }
+    
     let url = '/api/turnos';
     if (user.role === 'barber') {
         url += `?barbero_id=${user.barbero_id}`;
@@ -798,22 +808,52 @@ function loadAgenda() {
             if (tbody) {
                 tbody.innerHTML = '';
                 if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding: 24px;">No hay turnos registrados en la agenda.</td></tr>`;
+                    const cols = isAdmin ? 6 : 5;
+                    tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center; color:var(--text-muted); padding: 24px;">No hay turnos registrados en la agenda.</td></tr>`;
                     return;
                 }
                 data.forEach(t => {
                     const tr = document.createElement("tr");
+                    let actionsTd = '';
+                    if (isAdmin) {
+                        actionsTd = `<td><button class="delete-btn" onclick="deleteTurno(${t.id})" style="background: none; border: none; cursor: pointer; color: var(--danger); font-size: 16px;">❌</button></td>`;
+                    }
                     tr.innerHTML = `
                         <td><strong>${t.cliente_nombre}</strong></td>
                         <td>${t.cliente_telefono}</td>
                         <td>${t.barbero_nombre}</td>
                         <td>${t.fecha_hora} hs</td>
                         <td><span class="status-badge ${t.estado.toLowerCase()}">${t.estado}</span></td>
+                        ${actionsTd}
                     `;
                     tbody.appendChild(tr);
                 });
             }
         });
+}
+
+function deleteTurno(id) {
+    if (!confirm("¿Estás seguro de que deseas eliminar este turno de la agenda?")) return;
+    
+    fetch(`/api/turno/${id}`, {
+        method: 'DELETE'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);
+            loadAgenda();
+            // Si hay loadDashboard definido para refrescar métricas
+            if (typeof loadDashboard === 'function') {
+                loadDashboard();
+            }
+        } else {
+            alert("Error al eliminar turno: " + data.error);
+        }
+    })
+    .catch(err => {
+        alert("Error al conectar con el servidor: " + err);
+    });
 }
 
 // AUDITORÍA DE SERVICIOS (ADMIN ONLY)
