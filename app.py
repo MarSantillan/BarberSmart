@@ -245,21 +245,7 @@ def get_turnos():
     conn.close()
     return jsonify(turnos)
 
-@app.route('/api/chat', methods=['POST'])
-def process_chat():
-    """
-    Simulación del chatbot de reservas de WhatsApp
-    """
-    data = request.get_json() or {}
-    name = data.get("name", "Cliente Simulado")
-    phone = data.get("phone", "1100000000")
-    message = data.get("message", "")
-    
-    if not message:
-        return jsonify({"error": "Mensaje vacío"}), 400
-        
-    res = booking_agent.process_message(name, phone, message)
-    return jsonify(res)
+
 
 @app.route('/api/whatsapp/webhook', methods=['POST'])
 def whatsapp_webhook():

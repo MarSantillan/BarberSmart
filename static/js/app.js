@@ -52,7 +52,6 @@ function checkSession() {
     
     // Restringir visualización según rol
     const navDashboard = document.getElementById("nav-dashboard");
-    const navTurnos = document.getElementById("nav-turnos");
     const navCargarGasto = document.getElementById("nav-cargar-gasto");
     const navAgenda = document.getElementById("nav-agenda-turnos");
     const srvBarbero = document.getElementById("srv-barbero");
@@ -60,7 +59,6 @@ function checkSession() {
     if (user.role === 'barber') {
         // Ocultar tabs administrativas
         if (navDashboard) navDashboard.classList.add("hidden");
-        if (navTurnos) navTurnos.classList.add("hidden");
         if (navCargarGasto) navCargarGasto.classList.add("hidden");
         if (navAgenda) navAgenda.classList.remove("hidden");
         
@@ -77,7 +75,6 @@ function checkSession() {
     } else {
         // Admin ve todo
         if (navDashboard) navDashboard.classList.remove("hidden");
-        if (navTurnos) navTurnos.classList.remove("hidden");
         if (navCargarGasto) navCargarGasto.classList.remove("hidden");
         if (navAgenda) navAgenda.classList.remove("hidden");
         
@@ -724,52 +721,7 @@ function runMonthlyClosure() {
     });
 }
 
-// SIMULADOR CHAT DE WHATSAPP
-function sendChatMessage() {
-    const input = document.getElementById('chat-input-msg');
-    const msg = input.value.trim();
-    if (!msg) return;
-    
-    const clientName = document.getElementById('chat-client-name').value;
-    const clientPhone = document.getElementById('chat-client-phone').value;
-    
-    appendMessage(msg, 'user');
-    input.value = '';
-    
-    fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            name: clientName,
-            phone: clientPhone,
-            message: msg
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        appendMessage(data.response, 'bot');
-    });
-}
 
-function handleChatKey(e) {
-    if (e.key === 'Enter') {
-        sendChatMessage();
-    }
-}
-
-function appendMessage(text, sender) {
-    const messagesArea = document.getElementById('chat-messages');
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `message ${sender}`;
-    msgDiv.innerText = text;
-    messagesArea.appendChild(msgDiv);
-    messagesArea.scrollTop = messagesArea.scrollHeight;
-}
-
-function useSugerencia(text) {
-    document.getElementById('chat-input-msg').value = text;
-    sendChatMessage();
-}
 
 // CARGAR AGENDA DE TURNOS (ADMIN O FILTRADO POR BARBERO)
 function loadAgenda() {

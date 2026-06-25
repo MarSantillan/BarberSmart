@@ -78,9 +78,7 @@
                 <button id="nav-dashboard" class="nav-btn active" onclick="switchTab('dashboard')">
                     <span class="nav-icon">📊</span> Dashboard Contable
                 </button>
-                <button id="nav-turnos" class="nav-btn" onclick="switchTab('turnos')">
-                    <span class="nav-icon">💬</span> WhatsApp Reservas
-                </button>
+
                 <button id="nav-agenda-turnos" class="nav-btn" onclick="switchTab('agenda-turnos')">
                     <span class="nav-icon">📅</span> Agenda de Turnos
                 </button>
@@ -287,59 +285,7 @@
                 </div>
             </section>
 
-            <!-- SECCIÓN 2: SIMULADOR WHATSAPP RESERVAS -->
-            <section id="tab-turnos" class="tab-content">
-                <header class="tab-header">
-                    <h1>Simulador de Chat de WhatsApp</h1>
-                    <p>Prueba interactiva del agente de reservas y negociación de turnos (ReAct)</p>
-                </header>
 
-                <div class="chat-simulation-container">
-                    
-                    <!-- Configuración del cliente -->
-                    <div class="chat-config-card">
-                        <h3>Configurar Cliente</h3>
-                        <div class="form-group">
-                            <label for="chat-client-name">Nombre:</label>
-                            <input type="text" id="chat-client-name" value="Martín Rodríguez" class="styled-input">
-                        </div>
-                        <div class="form-group">
-                            <label for="chat-client-phone">Celular:</label>
-                            <input type="text" id="chat-client-phone" value="1144558822" class="styled-input">
-                        </div>
-                        
-                        <h4>Frases sugeridas para probar:</h4>
-                        <ul class="sugerencias-list">
-                            <li onclick="useSugerencia('Hola, quiero turno con Lucas el sábado a las 15')">"Hola, quiero turno con Lucas el sábado a las 15"</li>
-                            <li onclick="useSugerencia('Quiero agendar corte para el sábado a las 15:00 con Lucas')">"Quiero agendar corte para el sábado a las 15:00 con Lucas" <small>(Genera colisión)</small></li>
-                            <li onclick="useSugerencia('Hola, turno para corte el sábado con Martín a las 16 hs')">"Hola, turno para corte el sábado con Martín a las 16 hs"</li>
-                        </ul>
-                    </div>
-
-                    <!-- Pantalla del celular -->
-                    <div class="smartphone">
-                        <div class="smartphone-screen">
-                            <div class="chat-header">
-                                <span class="chat-avatar">💈</span>
-                                <div class="chat-info">
-                                    <h4>SmartBarber Bot</h4>
-                                    <span>En línea (Agente IA)</span>
-                                </div>
-                            </div>
-                            
-                            <div id="chat-messages" class="chat-messages-area">
-                                <div class="message system">Conversación iniciada con SmartBarber Bot</div>
-                                <div class="message bot">¡Hola! ¿En qué puedo ayudarte hoy? ¿Quieres reservar un corte o servicio?</div>
-                            </div>
-                            
-                            <div class="chat-input-area">
-                                <input type="text" id="chat-input-msg" placeholder="Escribe un mensaje..." onkeypress="handleChatKey(event)">
-                                <button onclick="sendChatMessage()">Enviar</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
 
             <!-- SECCIÓN 3: CARGAR SERVICIOS (BARBERO) -->
             <section id="tab-cargar-servicio" class="tab-content">
