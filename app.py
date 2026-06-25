@@ -261,6 +261,42 @@ def process_chat():
     res = booking_agent.process_message(name, phone, message)
     return jsonify(res)
 
+@app.route('/api/whatsapp/webhook', methods=['POST'])
+def whatsapp_webhook():
+    """
+    Webhook para integrar el bot de reservas con Twilio WhatsApp API.
+    Recibe datos de formulario (application/x-www-form-urlencoded) y responde en formato TwiML (XML).
+    """
+    import html
+    
+    # Extraer variables de la petición de Twilio
+    message = request.form.get('Body', '').strip()
+    from_number = request.form.get('From', '')
+    profile_name = request.form.get('ProfileName', 'Cliente')
+
+    if not message:
+        return ("", 200, {'Content-Type': 'text/xml'})
+
+    # Formatear teléfono (quitar prefijo 'whatsapp:')
+    client_phone = from_number.replace('whatsapp:', '').strip()
+    client_name = profile_name
+
+    # Procesar con el agente ReAct de reservas
+    res = booking_agent.process_message(client_name, client_phone, message)
+    response_text = res.get("response", "")
+
+    # Escapar caracteres para evitar XML inválido
+    escaped_response = html.escape(response_text)
+
+    # Formar la respuesta TwiML nativa
+    twiml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>{escaped_response}</Message>
+</Response>"""
+
+    return (twiml_response, 200, {'Content-Type': 'text/xml'})
+
+
 @app.route('/api/servicio', methods=['POST'])
 def register_service():
     """
