@@ -29,13 +29,14 @@ def get_dashboard_data():
     cursor.execute("SELECT SUM(monto_pesos) FROM inversion_inicial")
     inversion_total = cursor.fetchone()[0] or 0.0
     
-    cursor.execute("SELECT SUM(monto_amortizado), saldo_pendiente FROM amortizaciones ORDER BY id DESC LIMIT 1")
+    cursor.execute("SELECT SUM(monto_amortizado) FROM amortizaciones")
+    total_amortizado = cursor.fetchone()[0] or 0.0
+    
+    cursor.execute("SELECT saldo_pendiente FROM amortizaciones ORDER BY id DESC LIMIT 1")
     row = cursor.fetchone()
-    if row and row[0] is not None:
-        total_amortizado = row[0]
-        saldo_pendiente = row[1]
+    if row is not None:
+        saldo_pendiente = row[0]
     else:
-        total_amortizado = 0.0
         saldo_pendiente = inversion_total
         
     # 2. Servicios realizados del mes corriente (Junio 2026 en el simulador)
