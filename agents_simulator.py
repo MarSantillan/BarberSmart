@@ -199,21 +199,45 @@ class BookingAgent:
             
         # Parsear variables del mensaje del usuario
         new_barbero_name = None
-        if "lucas" in message_lower:
-            new_barbero_name = "Lucas"
-        elif "martin" in message_lower or "martín" in message_lower:
-            new_barbero_name = "Martín"
-        elif "cualquiera" in message_lower or "cualquier" in message_lower:
-            new_barbero_name = "Cualquiera"
+        if state["state"] == "AWAITING_INFO" and not state["barbero_id"]:
+            if message_lower in ["1", "uno", "1️⃣"]:
+                new_barbero_name = "Lucas"
+            elif message_lower in ["2", "dos", "2️⃣"]:
+                new_barbero_name = "Martín"
+            elif message_lower in ["3", "tres", "3️⃣"]:
+                new_barbero_name = "Cualquiera"
+        
+        if not new_barbero_name:
+            if "lucas" in message_lower:
+                new_barbero_name = "Lucas"
+            elif "martin" in message_lower or "martín" in message_lower:
+                new_barbero_name = "Martín"
+            elif "cualquiera" in message_lower or "cualquier" in message_lower:
+                new_barbero_name = "Cualquiera"
             
-        new_service = self.parse_servicio(message_lower)
+        new_service = None
+        if state["state"] == "AWAITING_INFO" and state["barbero_id"] and not state["servicio_nombre"]:
+            if message_lower in ["1", "uno", "1️⃣"]:
+                new_service = "Corte de pelo"
+            elif message_lower in ["2", "dos", "2️⃣"]:
+                new_service = "Corte y Barba"
+            elif message_lower in ["3", "tres", "3️⃣"]:
+                new_service = "Tintura"
+            elif message_lower in ["4", "cuatro", "4️⃣"]:
+                new_service = "Champú"
+            elif message_lower in ["5", "cinco", "5️⃣"]:
+                new_service = "Loción Post Afeitado"
+                
+        if not new_service:
+            new_service = self.parse_servicio(message_lower)
+            
         new_date = self.parse_date(message_lower)
         new_time = self.parse_time(message_lower)
         
         # Lógica en base al estado de la conversación
         if state["state"] == "AWAITING_CONFIRMATION":
             # Si el usuario responde afirmativamente
-            if any(confirm_word in message_lower for confirm_word in ["si", "sí", "confirmar", "confirmo", "ok", "dale", "correcto", "de una"]):
+            if message_lower in ["1", "uno", "1️⃣"] or any(confirm_word in message_lower for confirm_word in ["si", "sí", "confirmar", "confirmo", "ok", "dale", "correcto", "de una"]):
                 barbero_id = state["barbero_id"]
                 servicio_nombre = state["servicio_nombre"]
                 fecha = state["fecha"]
@@ -263,7 +287,7 @@ class BookingAgent:
                     return self.generate_alternatives_response(client_phone, state, fecha_hora_solicitada)
             
             # Si el usuario responde negativamente o quiere cambiar algo
-            elif any(neg_word in message_lower for neg_word in ["no", "cambiar", "cancelar", "modificar", "editar"]):
+            elif message_lower in ["2", "dos", "2️⃣"] or any(neg_word in message_lower for neg_word in ["no", "cambiar", "cancelar", "modificar", "editar"]):
                 # Si en el mensaje especificó qué cambiar (ej. "con Martin" o "a las 17")
                 has_updates = False
                 if new_barbero_name:
@@ -302,7 +326,7 @@ class BookingAgent:
                     barbero_det = self.get_barbero_details(state["barbero_id"])
                     return {
                         "status": "awaiting_confirmation",
-                        "response": f"Entendido, he actualizado los datos. Por favor confirma:\n- Barbero: {barbero_det['nombre']}\n- Servicio: {state['servicio_nombre']}\n- Fecha y Hora: {state['fecha']} a las {state['hora']} hs.\n\n¿Confirmas ahora? (SÍ/NO)"
+                        "response": f"Entendido, he actualizado los datos. Por favor confirma:\n- Barbero: {barbero_det['nombre']}\n- Servicio: {state['servicio_nombre']}\n- Fecha y Hora: {state['fecha']} a las {state['hora']} hs.\n\n¿Confirmas ahora? Responde con el número:\n1️⃣ SÍ (Confirmar turno)\n2️⃣ NO (Modificar datos)"
                     }
                 else:
                     state["state"] = "AWAITING_INFO"
@@ -337,12 +361,12 @@ class BookingAgent:
                     barbero_det = self.get_barbero_details(state["barbero_id"])
                     return {
                         "status": "awaiting_confirmation",
-                        "response": f"He actualizado los detalles. Por favor confirma si es correcto:\n- Barbero: {barbero_det['nombre']}\n- Servicio: {state['servicio_nombre']}\n- Fecha y Hora: {state['fecha']} a las {state['hora']} hs.\n\n¿Confirmas ahora? (SÍ/NO)"
+                        "response": f"He actualizado los detalles. Por favor confirma si es correcto:\n- Barbero: {barbero_det['nombre']}\n- Servicio: {state['servicio_nombre']}\n- Fecha y Hora: {state['fecha']} a las {state['hora']} hs.\n\n¿Confirmas ahora? Responde con el número:\n1️⃣ SÍ (Confirmar turno)\n2️⃣ NO (Modificar datos)"
                     }
                 else:
                     return {
                         "status": "awaiting_confirmation",
-                        "response": "Por favor, responde SÍ para confirmar el turno con los datos mencionados, o NO si deseas modificarlos."
+                        "response": "Por favor, responde 1️⃣ para SÍ o 2️⃣ para NO para indicar si deseas confirmar o modificar los datos."
                     }
 
         # Estado AWAITING_INFO o Estado nuevo:
@@ -364,14 +388,14 @@ class BookingAgent:
             self.save_chat_state(client_phone, state)
             return {
                 "status": "awaiting_info",
-                "response": "¡Hola! Bienvenido a la Barbería. ¿Con qué barbero te gustaría atenderte? (Tenemos a Lucas y Martín, o puedes decir 'cualquiera')"
+                "response": "¡Hola! Bienvenido a la Barbería. ¿Con qué barbero te gustaría atenderte? Responde con el número correspondiente:\n1️⃣ Lucas\n2️⃣ Martín\n3️⃣ Cualquiera"
             }
             
         if not state["servicio_nombre"]:
             self.save_chat_state(client_phone, state)
             return {
                 "status": "awaiting_info",
-                "response": "¿Qué servicio te gustaría realizarte? (Corte de pelo, Corte y Barba, Tintura, Champú, Loción Post Afeitado)"
+                "response": "¿Qué servicio te gustaría realizarte? Responde con el número correspondiente:\n1️⃣ Corte de pelo\n2️⃣ Corte y Barba\n3️⃣ Tintura\n4️⃣ Champú\n5️⃣ Loción Post Afeitado"
             }
             
         if not state["fecha"] or not state["hora"]:
@@ -403,7 +427,7 @@ class BookingAgent:
         barbero_det = self.get_barbero_details(state["barbero_id"])
         return {
             "status": "awaiting_confirmation",
-            "response": f"¡Perfecto! Tengo todos los datos listos para agendar:\n- Barbero: {barbero_det['nombre']}\n- Servicio: {state['servicio_nombre']}\n- Fecha y Hora: {state['fecha']} a las {state['hora']} hs.\n\n¿Confirmas estos datos? Responde SÍ para confirmar o NO si quieres realizar algún cambio."
+            "response": f"¡Perfecto! Tengo todos los datos listos para agendar:\n- Barbero: {barbero_det['nombre']}\n- Servicio: {state['servicio_nombre']}\n- Fecha y Hora: {state['fecha']} a las {state['hora']} hs.\n\n¿Confirmas estos datos? Responde con el número correspondiente:\n1️⃣ SÍ (Confirmar turno)\n2️⃣ NO (Modificar datos)"
         }
 
     def assign_random_barber(self):
