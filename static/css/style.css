@@ -87,6 +87,12 @@ body {
     flex-grow: 1;
     overflow-y: auto;
     margin-bottom: 16px;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+}
+
+.nav-menu::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
 }
 
 .nav-btn {
