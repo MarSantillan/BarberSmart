@@ -100,12 +100,15 @@ def init_db():
     )
     """)
     
+    conn.commit()
+    
     # Agregar columnas si no existen (migración segura para bases existentes)
     for col in [("recordatorio_24h_enviado", "INTEGER DEFAULT 0"), ("recordatorio_1h_enviado", "INTEGER DEFAULT 0")]:
         try:
             cursor.execute(f"ALTER TABLE turnos ADD COLUMN {col[0]} {col[1]}")
+            conn.commit()
         except Exception:
-            pass
+            conn.rollback()
     
     # 3. Tabla de insumos
     cursor.execute("""
