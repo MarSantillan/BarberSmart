@@ -549,10 +549,80 @@ def update_expense(gasto_id):
     conn.close()
     return jsonify({"status": "success", "message": "Gasto actualizado."})
 
+def process_reminders_task():
+    conn = get_connection()
+    cursor = conn.cursor()
+    ahora = datetime.now()
+    
+    # Buscar turnos activos (no cancelados ni realizados)
+    cursor.execute("""
+    SELECT t.id, t.cliente_nombre, t.cliente_telefono, t.fecha_hora, b.nombre,
+           t.recordatorio_24h_enviado, t.recordatorio_1h_enviado
+    FROM turnos t
+    JOIN barberos b ON t.barbero_id = b.id
+    WHERE t.estado IN ('Confirmado', 'Pendiente')
+      AND (t.recordatorio_24h_enviado = 0 OR t.recordatorio_1h_enviado = 0)
+    """)
+    
+    turnos = cursor.fetchall()
+    for t_id, cli_n, cli_tel, fh_str, bar_n, rec_24h, rec_1h in turnos:
+        try:
+            fh = datetime.strptime(fh_str, "%Y-%m-%d %H:%M")
+            diff_seconds = (fh - ahora).total_seconds()
+            diff_hours = diff_seconds / 3600.0
+            
+            # Recordatorio 24h
+            if rec_24h == 0 and 23.0 <= diff_hours <= 25.0:
+                msg = f"Hola {cli_n}, te recordamos tu turno de mañana a las {fh.strftime('%H:%M')} hs con el barbero {bar_n}."
+                booking_agent._send_whatsapp(cli_tel, msg)
+                cursor.execute("UPDATE turnos SET recordatorio_24h_enviado = 1 WHERE id = ?", (t_id,))
+                conn.commit()
+                print(f"[RECORDATORIO 24h] Enviado a {cli_n} para el turno a las {fh_str}")
+                
+            # Recordatorio 1h
+            elif rec_1h == 0 and 0.8 <= diff_hours <= 1.2:
+                msg = f"Hola {cli_n}, te recordamos tu turno en 1 hora (a las {fh.strftime('%H:%M')} hs) con el barbero {bar_n}."
+                booking_agent._send_whatsapp(cli_tel, msg)
+                cursor.execute("UPDATE turnos SET recordatorio_1h_enviado = 1 WHERE id = ?", (t_id,))
+                conn.commit()
+                print(f"[RECORDATORIO 1h] Enviado a {cli_n} para el turno a las {fh_str}")
+        except Exception as e:
+            print(f"Error procesando recordatorio para turno {t_id}: {e}")
+            
+    conn.close()
+
+def start_reminder_thread():
+    import threading
+    import time
+    
+    def run_scheduler():
+        print("[SISTEMA] Hilo de recordatorios automáticos iniciado.")
+        while True:
+            try:
+                time.sleep(60)
+                process_reminders_task()
+            except Exception as e:
+                print(f"Error en hilo de recordatorios: {e}")
+                
+    t = threading.Thread(target=run_scheduler, daemon=True)
+    t.start()
+
+@app.route('/api/recordatorios/procesar', methods=['POST', 'GET'])
+def trigger_reminders():
+    try:
+        process_reminders_task()
+        return jsonify({"status": "success", "message": "Recordatorios procesados correctamente."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 if __name__ == '__main__':
     # Crear carpetas estáticas si no existen
     os.makedirs('templates', exist_ok=True)
     os.makedirs('static/css', exist_ok=True)
     os.makedirs('static/js', exist_ok=True)
     
+    # Evitar doble ejecución del hilo en modo debug de Flask
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
+        start_reminder_thread()
+        
     app.run(debug=True, port=5000)

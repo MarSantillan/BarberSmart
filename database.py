@@ -94,9 +94,18 @@ def init_db():
         barbero_id INTEGER,
         fecha_hora TEXT NOT NULL, -- Formato: YYYY-MM-DD HH:MM
         estado TEXT DEFAULT 'Pendiente', -- Pendiente, Confirmado, Cancelado, Realizado
+        recordatorio_24h_enviado INTEGER DEFAULT 0,
+        recordatorio_1h_enviado INTEGER DEFAULT 0,
         FOREIGN KEY (barbero_id) REFERENCES barberos (id)
     )
     """)
+    
+    # Agregar columnas si no existen (migración segura para bases existentes)
+    for col in [("recordatorio_24h_enviado", "INTEGER DEFAULT 0"), ("recordatorio_1h_enviado", "INTEGER DEFAULT 0")]:
+        try:
+            cursor.execute(f"ALTER TABLE turnos ADD COLUMN {col[0]} {col[1]}")
+        except Exception:
+            pass
     
     # 3. Tabla de insumos
     cursor.execute("""
