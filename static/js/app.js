@@ -539,14 +539,16 @@ function toggleInsumoSection() {
     const insumoSection = document.getElementById('insumo-section');
     const srvMonto = document.getElementById('srv-monto');
     
+    let requiresInsumos = false;
     if (window.serviciosOfrecidosData) {
         const found = window.serviciosOfrecidosData.find(s => s.nombre === servicio);
         if (found) {
             srvMonto.value = found.precio;
+            requiresInsumos = (found.gasta_insumo === 1);
         }
     }
     
-    if (servicio && servicio.includes("Tintura")) {
+    if (requiresInsumos) {
         insumoSection.classList.remove('hidden');
         
         const container = document.getElementById('insumos-rows-container');
@@ -878,13 +880,7 @@ function deleteInsumo(id, nombre) {
         return data;
     })
     .then(data => {
-        alert(data.message);
-        loadDashboard();
-    })
-    .catch(err => alert("Error: " + err.message));
-}
-
-function loadServiciosOfrecidos() {
+  function loadServiciosOfrecidos() {
     fetch('/api/servicios-ofrecidos')
         .then(res => {
             if (!res.ok) throw new Error("Error al obtener servicios ofrecidos");
@@ -905,11 +901,20 @@ function loadServiciosOfrecidos() {
                 const div = document.createElement('div');
                 div.className = 'inv-item';
                 div.style = "display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--card-bg-light); border: 1px solid var(--card-border); border-radius: 8px;";
+                
+                let insumoBadge = '';
+                if (item.gasta_insumo === 1) {
+                    insumoBadge = `<span style="font-size: 11px; padding: 2px 6px; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border-radius: 4px; margin-left: 8px;">Insumos</span>`;
+                }
+                
                 div.innerHTML = `
-                    <span>💇‍♂️ ${item.nombre}</span>
+                    <div style="display: flex; align-items: center;">
+                        <span>💇‍♂️ ${item.nombre}</span>
+                        ${insumoBadge}
+                    </div>
                     <div class="list-actions" style="display: flex; align-items: center; gap: 8px;">
                         <strong style="color: var(--success); font-size: 14px;">$${item.precio.toLocaleString('es-AR')}</strong>
-                        <span class="action-icon edit" onclick="editOfferedService(${item.id}, '${item.nombre.replace(/'/g, "\\'")}', ${item.precio})" title="Editar" style="cursor: pointer; font-size: 13px;">✏️</span>
+                        <span class="action-icon edit" onclick="editOfferedService(${item.id}, '${item.nombre.replace(/'/g, "\\'")}', ${item.precio}, ${item.gasta_insumo})" title="Editar" style="cursor: pointer; font-size: 13px;">✏️</span>
                         <span class="action-icon delete" onclick="deleteOfferedService(${item.id}, '${item.nombre.replace(/'/g, "\\'")}')" title="Eliminar" style="cursor: pointer; font-size: 13px;">❌</span>
                     </div>
                 `;
@@ -922,11 +927,13 @@ function loadServiciosOfrecidos() {
 function submitOfferedService() {
     const nombreInput = document.getElementById('srv-ofrecido-nombre');
     const precioInput = document.getElementById('srv-ofrecido-precio');
+    const gastaInsumoInput = document.getElementById('srv-ofrecido-gasta-insumo');
     
     if (!nombreInput || !precioInput) return;
     
     const nombre = nombreInput.value.trim();
     const precio = parseFloat(precioInput.value);
+    const gasta_insumo = gastaInsumoInput ? (gastaInsumoInput.checked ? 1 : 0) : 0;
     
     if (!nombre || isNaN(precio) || precio <= 0) {
         alert("Por favor, ingresa un nombre válido y un precio mayor a 0.");
@@ -936,7 +943,7 @@ function submitOfferedService() {
     fetch('/api/servicios-ofrecidos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, precio })
+        body: JSON.stringify({ nombre, precio, gasta_insumo })
     })
     .then(async res => {
         const isJson = res.headers.get('content-type')?.includes('application/json');
@@ -948,13 +955,14 @@ function submitOfferedService() {
         alert(data.message);
         nombreInput.value = '';
         precioInput.value = '';
+        if (gastaInsumoInput) gastaInsumoInput.checked = false;
         loadServiciosOfrecidos();
         loadSelectOptions();
     })
     .catch(err => alert("Error: " + err.message));
 }
 
-function editOfferedService(id, currentNombre, currentPrecio) {
+function editOfferedService(id, currentNombre, currentPrecio, currentGastaInsumo) {
     const nombre = prompt("Modificar Nombre del Servicio:", currentNombre);
     if (nombre === null) return;
     
@@ -968,10 +976,13 @@ function editOfferedService(id, currentNombre, currentPrecio) {
         return;
     }
     
+    const gastaInsumoConfirm = confirm(`¿Requiere insumos este servicio? (Actualmente: ${currentGastaInsumo === 1 ? 'SÍ' : 'NO'})\nPresiona Aceptar para SÍ, o Cancelar para NO.`);
+    const gasta_insumo = gastaInsumoConfirm ? 1 : 0;
+    
     fetch(`/api/servicios-ofrecidos/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre: nombre.trim(), precio })
+        body: JSON.stringify({ nombre: nombre.trim(), precio, gasta_insumo })
     })
     .then(async res => {
         const isJson = res.headers.get('content-type')?.includes('application/json');

@@ -216,10 +216,23 @@ def init_db():
     CREATE TABLE IF NOT EXISTS servicios_ofrecidos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nombre TEXT NOT NULL UNIQUE,
-        precio REAL NOT NULL
+        precio REAL NOT NULL,
+        gasta_insumo INTEGER DEFAULT 0
     )
     """)
     
+    # Migración: Agregar columna gasta_insumo si no existe
+    try:
+        cursor.execute("ALTER TABLE servicios_ofrecidos ADD COLUMN gasta_insumo INTEGER DEFAULT 0")
+    except Exception:
+        pass
+        
+    # Migración: Actualizar por defecto servicios de tintura existentes
+    try:
+        cursor.execute("UPDATE servicios_ofrecidos SET gasta_insumo = 1 WHERE nombre LIKE '%Tintura%'")
+    except Exception:
+        pass
+        
     conn.commit()
     conn.close()
     print("Base de datos inicializada correctamente.")
@@ -290,13 +303,13 @@ def seed_db():
     cursor.execute("SELECT COUNT(*) FROM servicios_ofrecidos")
     if cursor.fetchone()[0] == 0:
         servicios_defecto = [
-            ('Corte de pelo', 5000.0),
-            ('Recorte de barba', 3000.0),
-            ('Corte y Barba', 7000.0),
-            ('Tintura Negra', 12000.0),
-            ('Tintura Castaño', 12000.0)
+            ('Corte de pelo', 5000.0, 0),
+            ('Recorte de barba', 3000.0, 0),
+            ('Corte y Barba', 7000.0, 0),
+            ('Tintura Negra', 12000.0, 1),
+            ('Tintura Castaño', 12000.0, 1)
         ]
-        cursor.executemany("INSERT INTO servicios_ofrecidos (nombre, precio) VALUES (?, ?)", servicios_defecto)
+        cursor.executemany("INSERT INTO servicios_ofrecidos (nombre, precio, gasta_insumo) VALUES (?, ?, ?)", servicios_defecto)
         conn.commit()
         print("Servicios ofrecidos inicializados por defecto.")
         

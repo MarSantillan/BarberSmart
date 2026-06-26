@@ -71,6 +71,35 @@ def get_dashboard_data():
         if alert:
             alertas_list.append(f"Stock bajo: {nombre} ({ml_act:.1f}ml restantes)")
             
+    # Calcular cortes de pelo faltantes para pagar gastos fijos del mes actual
+    try:
+        status_mes = finance_agent.calculate_monthly_status("2026-06")
+        gastos_fijos_total = status_mes.get("gastos_fijos", 0.0)
+        retencion_local = status_mes.get("retencion_local_total", 0.0)
+        comision_aplicada = status_mes.get("comision_aplicada", 50.0)
+        
+        # Buscar el precio del corte de pelo
+        cursor.execute("SELECT precio FROM servicios_ofrecidos WHERE nombre = 'Corte de pelo'")
+        row_corte = cursor.fetchone()
+        precio_corte = row_corte[0] if row_corte else 5000.0
+        
+        # Ganancia para el local por cada corte de pelo
+        retencion_por_corte = precio_corte * (1 - comision_aplicada / 100.0)
+        
+        deficit = gastos_fijos_total - retencion_local
+        if deficit > 0:
+            import math
+            cortes_faltantes = math.ceil(deficit / retencion_por_corte)
+            alertas_list.append(
+                f"Faltan realizar {cortes_faltantes} cortes de pelo para cubrir los gastos fijos del mes "
+                f"(faltan ${deficit:,.2f} netos para el local, considerando un precio de ${precio_corte:,.0f} "
+                f"y comisión del {comision_aplicada:.0f}%)."
+            )
+        else:
+            alertas_list.append("¡Felicidades! Los gastos fijos del local para este mes ya están 100% cubiertos.")
+    except Exception as e:
+        print(f"Error al calcular cortes faltantes: {e}")
+            
     # 5. Listado de turnos recientes
     cursor.execute("""
     SELECT t.id, t.cliente_nombre, t.fecha_hora, t.estado, b.nombre 
@@ -289,10 +318,10 @@ def get_servicios_ofrecidos():
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, nombre, precio FROM servicios_ofrecidos ORDER BY nombre ASC")
+        cursor.execute("SELECT id, nombre, precio, gasta_insumo FROM servicios_ofrecidos ORDER BY nombre ASC")
         rows = cursor.fetchall()
         conn.close()
-        servicios = [{"id": r[0], "nombre": r[1], "precio": r[2]} for r in rows]
+        servicios = [{"id": r[0], "nombre": r[1], "precio": r[2], "gasta_insumo": r[3]} for r in rows]
         return jsonify(servicios)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -303,6 +332,7 @@ def create_servicio_ofrecido():
     data = request.get_json() or {}
     nombre = data.get("nombre")
     precio = data.get("precio")
+    gasta_insumo = 1 if data.get("gasta_insumo") else 0
     
     if not nombre or nombre.strip() == "":
         return jsonify({"error": "El nombre del servicio es obligatorio."}), 400
@@ -326,9 +356,9 @@ def create_servicio_ofrecido():
             return jsonify({"error": "Ya existe un servicio con ese nombre."}), 400
             
         cursor.execute("""
-            INSERT INTO servicios_ofrecidos (nombre, precio)
-            VALUES (?, ?)
-        """, (nombre.strip(), precio))
+            INSERT INTO servicios_ofrecidos (nombre, precio, gasta_insumo)
+            VALUES (?, ?, ?)
+        """, (nombre.strip(), precio, gasta_insumo))
         conn.commit()
         conn.close()
         return jsonify({"message": "Servicio agregado exitosamente."}), 201
@@ -341,6 +371,7 @@ def edit_servicio_ofrecido(service_id):
     data = request.get_json() or {}
     nombre = data.get("nombre")
     precio = data.get("precio")
+    gasta_insumo = 1 if data.get("gasta_insumo") else 0
     
     if not nombre or nombre.strip() == "":
         return jsonify({"error": "El nombre del servicio es obligatorio."}), 400
@@ -371,9 +402,9 @@ def edit_servicio_ofrecido(service_id):
             
         cursor.execute("""
             UPDATE servicios_ofrecidos
-            SET nombre = ?, precio = ?
+            SET nombre = ?, precio = ?, gasta_insumo = ?
             WHERE id = ?
-        """, (nombre.strip(), precio, service_id))
+        """, (nombre.strip(), precio, gasta_insumo, service_id))
         conn.commit()
         conn.close()
         return jsonify({"message": "Servicio actualizado exitosamente."})
