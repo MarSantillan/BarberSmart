@@ -371,26 +371,54 @@ function loadDashboard() {
                 document.getElementById('total-inversion-dynamic').innerText = `$${data.inversion_total.toLocaleString('es-AR')}`;
             }
 
-            // Actualizar Gastos Operativos Detallados (Dinámico con Editar/Eliminar)
+            // Actualizar Gastos Operativos Detallados e Insumos/Herramientas
             const gstList = document.getElementById('gastos-items-list');
-            if (gstList) {
+            const insGstList = document.getElementById('insumos-gastos-items-list');
+            
+            if (gstList && insGstList) {
                 gstList.innerHTML = '';
-                if (data.gastos_items.length === 0) {
-                    gstList.innerHTML = `<p style="color: var(--text-muted); font-size:13px;">No hay gastos cargados en este mes.</p>`;
-                }
+                insGstList.innerHTML = '';
+                
+                let hasOps = false;
+                let hasInsumos = false;
+                
+                const insumoKeywords = [
+                    "reposicion", "reposición", "tintura", "shampoo", "champu", 
+                    "champú", "crema", "locion", "loción", "insumo", "producto", 
+                    "tijera", "secador", "patillera", "peine", "maquina", "máquina", 
+                    "navaja", "bucleadora", "herramienta", "insumos"
+                ];
+                
                 data.gastos_items.forEach(item => {
+                    const conceptoLower = item.concepto.toLowerCase();
+                    const isInsumo = insumoKeywords.some(keyword => conceptoLower.includes(keyword));
+                    
                     const div = document.createElement('div');
                     div.className = 'inv-item';
                     div.innerHTML = `
-                        <span>💸 ${item.concepto}</span>
+                        <span>${isInsumo ? '📦' : '💸'} ${item.concepto}</span>
                         <div class="list-actions">
                             <strong style="margin-right: 8px;">$${item.monto.toLocaleString('es-AR')}</strong>
                             <span class="action-icon edit" onclick="editExpense(${item.id}, '${item.concepto}', ${item.monto})" title="Editar">✏️</span>
                             <span class="action-icon delete" onclick="deleteExpense(${item.id})" title="Eliminar">❌</span>
                         </div>
                     `;
-                    gstList.appendChild(div);
+                    
+                    if (isInsumo) {
+                        insGstList.appendChild(div);
+                        hasInsumos = true;
+                    } else {
+                        gstList.appendChild(div);
+                        hasOps = true;
+                    }
                 });
+                
+                if (!hasOps) {
+                    gstList.innerHTML = `<p style="color: var(--text-muted); font-size:13px;">No hay gastos operativos cargados en este mes.</p>`;
+                }
+                if (!hasInsumos) {
+                    insGstList.innerHTML = `<p style="color: var(--text-muted); font-size:13px;">No hay compras de insumos o herramientas cargadas en este mes.</p>`;
+                }
             }
             updateCharts(data);
             loadAgenda();
