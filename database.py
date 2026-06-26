@@ -199,6 +199,18 @@ def init_db():
     )
     """)
     
+    # 10. Tabla de insumos por servicio realizado (soporte multiproducto)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS servicio_insumos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        servicio_id INTEGER NOT NULL,
+        insumo_id INTEGER NOT NULL,
+        ml_consumidos REAL NOT NULL,
+        FOREIGN KEY (servicio_id) REFERENCES servicios_realizados (id) ON DELETE CASCADE,
+        FOREIGN KEY (insumo_id) REFERENCES insumos (id)
+    )
+    """)
+    
     conn.commit()
     conn.close()
     print("Base de datos inicializada correctamente.")

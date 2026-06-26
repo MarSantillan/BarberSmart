@@ -450,17 +450,51 @@ function loadSelectOptions() {
         .then(data => {
             window.insumosData = data; // Guardar en caché global
             
-            const insumoSelect = document.getElementById('srv-insumo');
-            if (insumoSelect) {
-                insumoSelect.innerHTML = '';
-                data.forEach(i => {
-                    const opt = document.createElement('option');
-                    opt.value = i.id;
-                    opt.innerText = i.nombre;
-                    insumoSelect.appendChild(opt);
-                });
-            }
+            // Popular todos los selectores de insumos de servicio activos
+            document.querySelectorAll('.srv-insumo-select').forEach(select => {
+                populateInsumoDropdown(select);
+            });
          });
+}
+
+function populateInsumoDropdown(selectElement) {
+    if (!selectElement || !window.insumosData) return;
+    selectElement.innerHTML = '';
+    window.insumosData.forEach(i => {
+        const opt = document.createElement('option');
+        opt.value = i.id;
+        opt.innerText = i.nombre;
+        selectElement.appendChild(opt);
+    });
+}
+
+function addInsumoRow() {
+    const container = document.getElementById('insumos-rows-container');
+    if (!container) return;
+    
+    const row = document.createElement('div');
+    row.className = 'insumo-row';
+    row.style = "display: flex; gap: 12px; align-items: center;";
+    
+    row.innerHTML = `
+        <select class="styled-input srv-insumo-select" style="flex-grow: 2;"></select>
+        <input type="number" class="styled-input srv-insumo-ml" placeholder="ml" value="50" style="flex-grow: 1; width: 80px;">
+        <button class="btn btn-secondary btn-remove-insumo-row" onclick="removeInsumoRow(this)" style="padding: 10px; background: transparent; border: 1px solid var(--card-border); color: #fff; cursor: pointer;" type="button">❌</button>
+    `;
+    
+    container.appendChild(row);
+    const select = row.querySelector('.srv-insumo-select');
+    populateInsumoDropdown(select);
+}
+
+function removeInsumoRow(btn) {
+    const row = btn.closest('.insumo-row');
+    const container = document.getElementById('insumos-rows-container');
+    if (container && container.querySelectorAll('.insumo-row').length > 1) {
+        row.remove();
+    } else {
+        alert("Debes tener al menos un insumo seleccionado si el servicio requiere insumos.");
+    }
 }
 
 // MOSTRAR/OCULTAR SECCIÓN DE INSUMOS SEGÚN SERVICIO
@@ -473,11 +507,26 @@ function toggleInsumoSection() {
         insumoSection.classList.remove('hidden');
         srvMonto.value = 12000;
         
-        const insumoSelect = document.getElementById('srv-insumo');
-        if (servicio.includes("Negra")) {
-            insumoSelect.value = 1;
-        } else {
-            insumoSelect.value = 2;
+        const container = document.getElementById('insumos-rows-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="insumo-row" style="display: flex; gap: 12px; align-items: center;">
+                    <select class="styled-input srv-insumo-select" style="flex-grow: 2;"></select>
+                    <input type="number" class="styled-input srv-insumo-ml" placeholder="ml" value="50" style="flex-grow: 1; width: 80px;">
+                    <button class="btn btn-secondary btn-remove-insumo-row" onclick="removeInsumoRow(this)" style="padding: 10px; background: transparent; border: 1px solid var(--card-border); color: #fff; cursor: pointer;" type="button">❌</button>
+                </div>
+            `;
+            const select = container.querySelector('.srv-insumo-select');
+            populateInsumoDropdown(select);
+            
+            // Auto-seleccionar Tintura Negra o Castaño
+            if (window.insumosData) {
+                const term = servicio.includes("Negra") ? "negra" : "castaño";
+                const match = window.insumosData.find(i => i.nombre.toLowerCase().includes(term));
+                if (match) {
+                    select.value = match.id;
+                }
+            }
         }
     } else {
         insumoSection.classList.add('hidden');
@@ -495,25 +544,54 @@ function submitService() {
     const metodo_pago = document.getElementById('srv-pago').value;
     
     const isTintura = !document.getElementById('insumo-section').classList.contains('hidden');
-    const insumo_id = isTintura ? document.getElementById('srv-insumo').value : null;
-    const ml_consumidos = isTintura ? document.getElementById('srv-ml').value : 0;
+    const insumos = [];
+    
+    if (isTintura) {
+        const rows = document.querySelectorAll('.insumo-row');
+        rows.forEach(row => {
+            const select = row.querySelector('.srv-insumo-select');
+            const inputMl = row.querySelector('.srv-insumo-ml');
+            if (select && inputMl) {
+                const ins_id = parseInt(select.value);
+                const ml = parseFloat(inputMl.value) || 0;
+                if (ins_id && ml > 0) {
+                    insumos.push({ insumo_id: ins_id, ml_consumidos: ml });
+                }
+            }
+        });
+        
+        if (insumos.length === 0) {
+            alert("Por favor agrega al menos un producto con cantidad de ml mayor a cero.");
+            return;
+        }
+    }
 
     if (!monto_cobrado || parseFloat(monto_cobrado) <= 0) {
         alert("Por favor ingresa un monto cobrado válido.");
         return;
     }
 
+    const payload = {
+        barbero_id,
+        servicio_nombre,
+        monto_cobrado,
+        metodo_pago,
+        insumos: insumos
+    };
+    
+    // Compatibilidad hacia atrás
+    if (insumos.length > 0) {
+        payload.insumo_id = insumos[0].insumo_id;
+        payload.ml_consumidos = insumos[0].ml_consumidos;
+    } else {
+        payload.insumo_id = null;
+        payload.ml_consumidos = 0;
+    }
+
     fetch('/api/servicio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            barbero_id,
-            servicio_nombre,
-            monto_cobrado,
-            metodo_pago,
-            insumo_id,
-            ml_consumidos
-        })
+        body: JSON.stringify(payload)
     })
     .then(async res => {
         const isJson = res.headers.get('content-type')?.includes('application/json');
@@ -530,6 +608,11 @@ function submitService() {
             alert(data.alerta_insumo);
         }
         loadDashboard();
+        
+        // Resetear inputs de servicio
+        document.getElementById('srv-monto').value = 5000;
+        document.getElementById('srv-nombre').value = 'Corte de pelo';
+        document.getElementById('insumo-section').classList.add('hidden');
     })
     .catch(err => {
         alert("Error al registrar servicio: " + err.message);

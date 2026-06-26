@@ -333,12 +333,19 @@
 
                         <!-- Sección dinámica de Insumo líquido (ml) -->
                         <div id="insumo-section" class="form-group hidden">
-                            <div class="insumo-alert-box">
-                                <label for="srv-insumo">Producto Fraccionado Utilizado:</label>
-                                <select id="srv-insumo" class="styled-input"></select>
+                            <div class="insumo-alert-box" style="padding: 16px; border-radius: 8px; border: 1px solid var(--card-border); background-color: var(--bg-dark);">
+                                <label style="font-weight: 600; color: #fff; display: block; margin-bottom: 12px;">Productos Fraccionados Utilizados:</label>
                                 
-                                <label for="srv-ml" style="margin-top: 8px; display: block;">Cantidad Utilizada (ml):</label>
-                                <input type="number" id="srv-ml" value="50" class="styled-input">
+                                <div id="insumos-rows-container" style="display: flex; flex-direction: column; gap: 12px;">
+                                    <!-- Fila inicial de insumo -->
+                                    <div class="insumo-row" style="display: flex; gap: 12px; align-items: center;">
+                                        <select class="styled-input srv-insumo-select" style="flex-grow: 2;"></select>
+                                        <input type="number" class="styled-input srv-insumo-ml" placeholder="ml" value="50" style="flex-grow: 1; width: 80px;">
+                                        <button class="btn btn-secondary btn-remove-insumo-row" onclick="removeInsumoRow(this)" style="padding: 10px; background: transparent; border: 1px solid var(--card-border); color: #fff; cursor: pointer;" type="button">❌</button>
+                                    </div>
+                                </div>
+                                
+                                <button class="btn btn-secondary" onclick="addInsumoRow()" style="margin-top: 16px; padding: 8px 16px; font-size: 12px; border: 1px dashed var(--primary); background: transparent; color: var(--primary);" type="button">➕ Agregar otro producto</button>
                             </div>
                         </div>
 

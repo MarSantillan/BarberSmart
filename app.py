@@ -295,9 +295,22 @@ def register_service():
     servicio_nombre = data.get("servicio_nombre")
     monto_cobrado = float(data.get("monto_cobrado", 0))
     metodo_pago = data.get("metodo_pago", "Efectivo")
+    insumos_lista = data.get("insumos", [])
     insumo_id = data.get("insumo_id")
     ml_consumidos = float(data.get("ml_consumidos", 0))
     
+    if not insumos_lista and insumo_id and ml_consumidos > 0:
+        insumos_lista = [{"insumo_id": insumo_id, "ml_consumidos": ml_consumidos}]
+        
+    first_insumo_id = None
+    first_ml_consumidos = 0.0
+    if insumos_lista:
+        try:
+            first_insumo_id = int(insumos_lista[0].get("insumo_id"))
+            first_ml_consumidos = float(insumos_lista[0].get("ml_consumidos", 0))
+        except (ValueError, TypeError):
+            pass
+            
     if not barbero_id or not servicio_nombre or monto_cobrado <= 0:
         return jsonify({"error": "Datos inválidos"}), 400
         
@@ -306,21 +319,41 @@ def register_service():
     conn = get_connection()
     cursor = conn.cursor()
     
-    # Insertar servicio en la BD
+    # 1. Insertar servicio en la BD principal (para compatibilidad)
     cursor.execute("""
     INSERT INTO servicios_realizados (turno_id, barbero_id, servicio_nombre, monto_cobrado, metodo_pago, ml_consumidos, insumo_id, fecha)
     VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)
-    """, (barbero_id, servicio_nombre, monto_cobrado, metodo_pago, ml_consumidos, insumo_id, fecha_hoy))
+    """, (barbero_id, servicio_nombre, monto_cobrado, metodo_pago, first_ml_consumidos, first_insumo_id, fecha_hoy))
+    
+    # Obtener el ID del servicio recién creado
+    cursor.execute("SELECT id FROM servicios_realizados ORDER BY id DESC LIMIT 1")
+    servicio_id = cursor.fetchone()[0]
+    
+    # 2. Insertar todos los insumos detallados en la tabla servicio_insumos y descontar stock
+    alertas_insumos = []
+    for item in insumos_lista:
+        try:
+            i_id = int(item.get("insumo_id"))
+            ml_c = float(item.get("ml_consumidos", 0))
+        except (ValueError, TypeError):
+            continue
+            
+        if i_id and ml_c > 0:
+            cursor.execute("""
+            INSERT INTO servicio_insumos (servicio_id, insumo_id, ml_consumidos)
+            VALUES (?, ?, ?)
+            """, (servicio_id, i_id, ml_c))
+            
+            # Descontar stock
+            res_insumo = supply_agent.record_service_supplies(i_id, ml_c)
+            if res_insumo and res_insumo.get("alerta_bajo_stock"):
+                alertas_insumos.append(res_insumo["alerta_mensaje"])
+                
     conn.commit()
     conn.close()
     
-    alerta_insumo = None
-    # Restar del stock de insumo si aplica
-    if insumo_id and ml_consumidos > 0:
-        res_insumo = supply_agent.record_service_supplies(insumo_id, ml_consumidos)
-        if res_insumo and res_insumo.get("alerta_bajo_stock"):
-            alerta_insumo = res_insumo["alerta_mensaje"]
-            
+    alerta_insumo = "\n".join(alertas_insumos) if alertas_insumos else None
+    
     return jsonify({
         "status": "success",
         "message": "Servicio registrado exitosamente.",

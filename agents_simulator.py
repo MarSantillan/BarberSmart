@@ -630,25 +630,54 @@ class FinanceAgent:
         
         # 3. Obtener todos los servicios aprobados del mes
         cursor.execute("""
-        SELECT s.barbero_id, s.monto_cobrado, s.ml_consumidos, i.precio_compra, i.ml_totales 
+        SELECT s.id, s.barbero_id, s.monto_cobrado, s.ml_consumidos, s.insumo_id 
         FROM servicios_realizados s
-        LEFT JOIN insumos i ON s.insumo_id = i.id
         WHERE strftime('%Y-%m', s.fecha) = ? AND s.aprobado = 1
         """, (mes_ano,))
         
-        servicios_mes = cursor.fetchall()
-        total_bruto_generado = sum(s[1] for s in servicios_mes)
+        servicios_mes_raw = cursor.fetchall()
+        servicios_mes = []
+        
+        for s_id, b_id, monto, ml_cons, ins_id in servicios_mes_raw:
+            costo_insumos = 0.0
+            # Consultar si tiene insumos detallados en la tabla servicio_insumos
+            cursor.execute("""
+                SELECT si.ml_consumidos, ins.precio_compra, ins.ml_totales 
+                FROM servicio_insumos si
+                JOIN insumos ins ON si.insumo_id = ins.id
+                WHERE si.servicio_id = ?
+            """, (s_id,))
+            secundarios = cursor.fetchall()
+            
+            if secundarios:
+                for ml_s, prec_s, ml_tot_s in secundarios:
+                    if ml_s and ml_s > 0 and prec_s and ml_tot_s and ml_tot_s > 0:
+                        costo_insumos += ml_s * (prec_s / ml_tot_s)
+            else:
+                # Fallback: Usar el insumo de la tabla principal
+                if ml_cons and ml_cons > 0 and ins_id:
+                    cursor.execute("SELECT precio_compra, ml_totales FROM insumos WHERE id = ?", (ins_id,))
+                    ins_row = cursor.fetchone()
+                    if ins_row:
+                        prec_s, ml_tot_s = ins_row
+                        if prec_s and ml_tot_s and ml_tot_s > 0:
+                            costo_insumos = ml_cons * (prec_s / ml_tot_s)
+                            
+            servicios_mes.append({
+                "barbero_id": b_id,
+                "monto_cobrado": monto,
+                "costo_insumos": costo_insumos
+            })
+            
+        total_bruto_generado = sum(s["monto_cobrado"] for s in servicios_mes)
         
         # 4. Evaluación de la Comisión Dinámica
         # Calculamos local_share_standard simulando comisiones al 50% descontando costos de producto
         local_share_standard = 0.0
-        for b_id, monto, ml_cons, precio, ml_tot in servicios_mes:
-            costo_prod = 0.0
-            if ml_cons and ml_cons > 0 and precio and ml_tot and ml_tot > 0:
-                costo_prod = ml_cons * (precio / ml_tot)
-            base_comision = max(0.0, monto - costo_prod)
+        for s in servicios_mes:
+            base_comision = max(0.0, s["monto_cobrado"] - s["costo_insumos"])
             payout_sim = base_comision * 0.50
-            local_share_standard += (monto - payout_sim)
+            local_share_standard += (s["monto_cobrado"] - payout_sim)
             
         if total_bruto_generado == 0:
             comision_efectiva = 50.0
@@ -661,7 +690,7 @@ class FinanceAgent:
             contingencia_activa = False
             
         # 5. Calcular liquidación para cada barbero
-        barberos_ids = set(s[0] for s in servicios_mes)
+        barberos_ids = set(s["barbero_id"] for s in servicios_mes)
         reporte_barberos = []
         shop_share_total = 0.0
         barber_payout_total = 0.0
@@ -672,13 +701,10 @@ class FinanceAgent:
             
             bruto = 0.0
             payout = 0.0
-            for serv_b_id, monto, ml_cons, precio, ml_tot in servicios_mes:
-                if serv_b_id == b_id:
-                    bruto += monto
-                    costo_prod = 0.0
-                    if ml_cons and ml_cons > 0 and precio and ml_tot and ml_tot > 0:
-                        costo_prod = ml_cons * (precio / ml_tot)
-                    base_comision = max(0.0, monto - costo_prod)
+            for s in servicios_mes:
+                if s["barbero_id"] == b_id:
+                    bruto += s["monto_cobrado"]
+                    base_comision = max(0.0, s["monto_cobrado"] - s["costo_insumos"])
                     payout += base_comision * (comision_efectiva / 100.0)
                     
             shop_cut = bruto - payout
