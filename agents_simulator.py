@@ -886,6 +886,119 @@ class AIAssistantAgent:
     def process_chat(self, message):
         message_lower = message.lower().strip()
         
+        # 1. Parsear intenciones de registro de gastos, inversiones o reposiciones
+        m_rep = re.search(
+            r'(?:reponer|reposici[oó]n|compr[eéoó]|agrega[rd]?)\s+'
+            r'(\d+)\s+'
+            r'([a-zñáéíóúü\s]+?)'
+            r'\s+de\s+(\d+(?:\.\d+)?)\s*(?:ml|mililitros)'
+            r'\s+(?:por|de|\$)\s*\$?(\d+(?:\.\d+)?)',
+            message_lower
+        )
+        if m_rep:
+            unidades = int(m_rep.group(1))
+            product_name = m_rep.group(2).strip()
+            ml_por_unidad = float(m_rep.group(3))
+            precio_total = float(m_rep.group(4))
+            product_name = re.sub(r'^(?:unidades\s+de\s+|botes\s+de\s+|packs\s+de\s+|botellas\s+de\s+)?', '', product_name)
+            
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, nombre FROM insumos")
+            rows = cursor.fetchall()
+            conn.close()
+            
+            def normalize_name(s):
+                s = s.lower().replace("á","a").replace("é","e").replace("í","i").replace("ó","o").replace("ú","u")
+                if s.endswith("s"):
+                    s = s[:-1]
+                return s
+            
+            p_name_norm = normalize_name(product_name)
+            best_match_id = None
+            best_match_name = None
+            for ins_id, ins_name in rows:
+                ins_name_norm = normalize_name(ins_name)
+                if p_name_norm in ins_name_norm or ins_name_norm in p_name_norm:
+                    best_match_id = ins_id
+                    best_match_name = ins_name
+                    break
+                    
+            if best_match_id:
+                res = SupplyAgent().replenish_supply(best_match_id, unidades, ml_por_unidad, precio_total)
+                if "error" not in res:
+                    return (
+                        f"🤖 **¡Reposición Exitosa!**\n\n"
+                        f"He ingresado la compra al stock y registrado el gasto automáticamente:\n"
+                        f"• **Insumo:** {best_match_name}\n"
+                        f"• **Cantidad:** {unidades} unidades x {ml_por_unidad} ml\n"
+                        f"• **Stock Total Agregado:** {unidades * ml_por_unidad} ml\n"
+                        f"• **Gasto Registrado:** ${precio_total:,.2f}\n\n"
+                        f"📈 El stock actual de **{best_match_name}** ahora es de **{res['ml_actual']:.1f} ml**."
+                    )
+                else:
+                    return f"🤖 Ocurrió un error al registrar la reposición: {res.get('error')}"
+            else:
+                return f"🤖 No encontré ningún insumo registrado que coincida con '{product_name}'. Puedes crearlo primero en la sección 'Gastos e Inversión'."
+
+        m_reg = re.search(
+            r'(?:compr[eéoó]|pago|pagu[eé]|pag[oó]|gasto|inversi[oó]n|registra[rd]?|agrega[rd]?)\s+'
+            r'(?:gasto\s+de\s+|inversi[oó]n\s+de\s+|un\s+|una\s+|de\s+|el\s+|la\s+|que\s+se\s+compr[oó]\s+|que\s+se\s+pag[oó]\s+)*'
+            r'([a-zñáéíóúü\s]+?)'
+            r'\s+(?:por|de|\$|vales\s+a|a)?\s*\$?\s*(\d+(?:\.\d+)?)',
+            message_lower
+        )
+        if m_reg:
+            concept = m_reg.group(1).strip()
+            amount = float(m_reg.group(2))
+            concept = re.sub(r'^(?:un|una|el|la|de|que)\s+', '', concept)
+            is_inversion = "invers" in message_lower
+            
+            if is_inversion:
+                rubro = "Otros"
+                concept_lower = concept.lower()
+                if any(w in concept_lower for w in ["silla", "sillón", "sillon", "espejo", "mueble", "mesa", "recepcion", "recepción", "lavacabezas", "estante"]):
+                    rubro = "Mobiliario"
+                elif any(w in concept_lower for w in ["pintura", "local", "techo", "matafuego", "cámara", "camara", "luz", "iluminacion", "iluminación", "aire", "acondicionado", "reforma", "obra"]):
+                    rubro = "Infraestructura"
+                elif any(w in concept_lower for w in ["tijera", "secador", "patillera", "peine", "maquina", "máquina", "navaja", "bucleadora", "herramienta"]):
+                    rubro = "Herramientas"
+                
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO inversion_inicial (rubro, detalle, monto_pesos) VALUES (?, ?, ?)",
+                    (rubro, concept.capitalize(), amount)
+                )
+                conn.commit()
+                conn.close()
+                return (
+                    f"🤖 **¡Registro Exitoso de Inversión!**\n\n"
+                    f"He registrado el bien en tu inversión inicial a amortizar:\n"
+                    f"• **Rubro:** {rubro}\n"
+                    f"• **Detalle:** {concept.capitalize()}\n"
+                    f"• **Monto:** ${amount:,.2f}\n\n"
+                    f"Los balances contables del dashboard se han actualizado automáticamente."
+                )
+            else:
+                conn = get_connection()
+                cursor = conn.cursor()
+                mes_ano = datetime.now().strftime("%Y-%m")
+                cursor.execute(
+                    "INSERT INTO gastos_fijos (concepto, monto, mes_ano) VALUES (?, ?, ?)",
+                    (concept.capitalize(), amount, mes_ano)
+                )
+                conn.commit()
+                conn.close()
+                return (
+                    f"🤖 **¡Gasto Registrado Exitosamente!**\n\n"
+                    f"He cargado el siguiente gasto operativo para el mes en curso:\n"
+                    f"• **Concepto:** {concept.capitalize()}\n"
+                    f"• **Monto:** ${amount:,.2f}\n"
+                    f"• **Mes:** {mes_ano}\n\n"
+                    f"Los balances contables del dashboard se han actualizado automáticamente."
+                )
+        
         # 0. Caso especial: "Se acabó el shampoo" (calcular costo promedio por servicio)
         if ("acabo" in message_lower or "acabó" in message_lower or "termino" in message_lower or "terminó" in message_lower) and \
            ("champu" in message_lower or "champú" in message_lower or "shampoo" in message_lower or "insumo" in message_lower or "producto" in message_lower):
