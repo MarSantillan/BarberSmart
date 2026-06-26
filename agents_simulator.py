@@ -781,34 +781,88 @@ class SupplyAgent:
     def __init__(self):
         pass
 
-    def replenish_supply(self, insumo_id, unidades, ml_por_unidad, precio_total):
+    def replenish_supply(self, insumo_id_or_nombre, unidades, ml_por_unidad, precio_total):
         """
         Incrementa la cantidad de mililitros (tanto actual como total para conservar el ratio)
-        y registra el gasto correspondiente de forma automática.
+        y registra el gasto correspondiente de forma automática. Admite tanto ID como Nombre.
+        Si se especifica un nombre que no existe, crea el insumo en el sistema.
         """
-        if not insumo_id or unidades <= 0 or ml_por_unidad <= 0 or precio_total <= 0:
+        if not insumo_id_or_nombre or unidades <= 0 or ml_por_unidad <= 0 or precio_total <= 0:
             return {"error": "Datos inválidos"}
             
         conn = get_connection()
         cursor = conn.cursor()
         
-        cursor.execute("SELECT nombre FROM insumos WHERE id = ?", (insumo_id,))
-        row = cursor.fetchone()
-        if not row:
+        insumo_id = None
+        nombre = None
+        
+        # Identificar si es un ID numérico o un Nombre en texto
+        if isinstance(insumo_id_or_nombre, int) or (isinstance(insumo_id_or_nombre, str) and insumo_id_or_nombre.isdigit()):
+            ins_id = int(insumo_id_or_nombre)
+            cursor.execute("SELECT id, nombre FROM insumos WHERE id = ?", (ins_id,))
+            row = cursor.fetchone()
+            if row:
+                insumo_id, nombre = row
+        else:
+            # Buscar por coincidencia exacta de nombre (insensible a mayúsculas/minúsculas)
+            target_name = insumo_id_or_nombre.strip().lower()
+            cursor.execute("SELECT id, nombre FROM insumos")
+            rows = cursor.fetchall()
+            for r_id, r_name in rows:
+                if r_name.strip().lower() == target_name:
+                    insumo_id = r_id
+                    nombre = r_name
+                    break
+            
+            # Si no existe, crear el insumo automáticamente
+            if insumo_id is None:
+                nombre = insumo_id_or_nombre.strip().capitalize()
+                ml_tot = unidades * ml_por_unidad
+                fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+                cursor.execute("""
+                    INSERT INTO insumos (nombre, ml_totales, ml_actuales, precio_compra, fecha_compra)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (nombre, ml_tot, ml_tot, precio_total, fecha_hoy))
+                conn.commit()
+                
+                # Obtener el ID
+                cursor.execute("SELECT id FROM insumos WHERE nombre = ?", (nombre,))
+                insumo_id = cursor.fetchone()[0]
+                
+                # Registrar el gasto fijo automáticamente
+                concepto = f"Reposición: {nombre} x{unidades}"
+                mes_ano = datetime.now().strftime("%Y-%m")
+                cursor.execute("""
+                    INSERT INTO gastos_fijos (concepto, monto, mes_ano) 
+                    VALUES (?, ?, ?)
+                """, (concepto, precio_total, mes_ano))
+                conn.commit()
+                conn.close()
+                
+                return {
+                    "status": "success",
+                    "nombre": nombre,
+                    "ml_agregados": ml_tot,
+                    "ml_actuales": ml_tot,
+                    "ml_totales": ml_tot,
+                    "monto_gasto": precio_total,
+                    "concepto": concepto,
+                    "message": f"Reposición y creación de nuevo insumo '{nombre}' registrada exitosamente."
+                }
+                
+        if not insumo_id:
             conn.close()
             return {"error": "Insumo no encontrado"}
             
-        nombre = row[0]
+        # Si ya existe, actualizar stock agregando la cantidad
         ml_agregados = unidades * ml_por_unidad
-        
-        # Actualizar stock en BD (ml_actuales y ml_totales)
         cursor.execute("""
             UPDATE insumos 
             SET ml_actuales = ml_actuales + ?, ml_totales = ml_totales + ? 
             WHERE id = ?
         """, (ml_agregados, ml_agregados, insumo_id))
         
-        # Registrar automáticamente el gasto fijo en gastos_fijos
+        # Registrar el gasto fijo automáticamente
         concepto = f"Reposición: {nombre} x{unidades}"
         mes_ano = datetime.now().strftime("%Y-%m")
         cursor.execute("""
@@ -830,7 +884,8 @@ class SupplyAgent:
             "ml_actuales": ml_act,
             "ml_totales": ml_tot,
             "monto_gasto": precio_total,
-            "concepto": concepto
+            "concepto": concepto,
+            "message": f"Reposición de {unidades} unidades de '{nombre}' registrada exitosamente."
         }
 
     def record_service_supplies(self, insumo_id, ml_usados):

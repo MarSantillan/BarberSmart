@@ -188,23 +188,22 @@ def get_insumos():
 @app.route('/api/insumo/reponer', methods=['POST'])
 def replenish_supply_route():
     data = request.get_json() or {}
-    insumo_id = data.get("insumo_id")
+    insumo_nombre = data.get("insumo_nombre") or data.get("insumo_id")
     unidades = data.get("unidades")
     ml_por_unidad = data.get("ml_por_unidad")
     precio_total = data.get("precio_total")
     
-    if not insumo_id or not unidades or not ml_por_unidad or not precio_total:
+    if not insumo_nombre or not unidades or not ml_por_unidad or not precio_total:
         return jsonify({"error": "Faltan datos requeridos para la reposición."}), 400
         
     try:
-        insumo_id = int(insumo_id)
         unidades = int(unidades)
         ml_por_unidad = float(ml_por_unidad)
         precio_total = float(precio_total)
     except ValueError:
         return jsonify({"error": "Tipos de datos inválidos."}), 400
         
-    res = supply_agent.replenish_supply(insumo_id, unidades, ml_por_unidad, precio_total)
+    res = supply_agent.replenish_supply(insumo_nombre, unidades, ml_por_unidad, precio_total)
     if "error" in res:
         return jsonify(res), 400
         

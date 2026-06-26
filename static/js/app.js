@@ -460,19 +460,7 @@ function loadSelectOptions() {
                     insumoSelect.appendChild(opt);
                 });
             }
-
-            const repSelect = document.getElementById('rep-insumo');
-            if (repSelect) {
-                repSelect.innerHTML = '';
-                data.forEach(i => {
-                    const opt = document.createElement('option');
-                    opt.value = i.id;
-                    opt.innerText = i.nombre;
-                    repSelect.appendChild(opt);
-                });
-                onInsumoChange(); // Autocompletar primer elemento
-            }
-        });
+         });
 }
 
 // MOSTRAR/OCULTAR SECCIÓN DE INSUMOS SEGÚN SERVICIO
@@ -986,36 +974,32 @@ function loadBarberServices(barberoId) {
         });
 }
 
-// AUTOCOMPLETAR CAPACIDAD DE INSUMO AL SELECCIONAR
-function onInsumoChange() {
-    const select = document.getElementById('rep-insumo');
+// SUGERIR CAPACIDAD DE INSUMO AL ESCRIBIR
+function onInsumoInput() {
+    const inputName = document.getElementById('rep-insumo');
     const inputMl = document.getElementById('rep-ml-unidad');
-    if (!select || !inputMl || !window.insumosData) return;
+    if (!inputName || !inputMl) return;
     
-    const selectedId = parseInt(select.value);
-    const insumo = window.insumosData.find(i => i.id === selectedId);
-    if (insumo) {
-        const nombre = insumo.nombre.toLowerCase();
-        if (nombre.includes("tintura")) {
-            inputMl.value = 250;
-        } else if (nombre.includes("champú") || nombre.includes("champu")) {
-            inputMl.value = 1000;
-        } else if (nombre.includes("loción") || nombre.includes("locion")) {
-            inputMl.value = 500;
-        } else {
-            inputMl.value = 250; // Fallback por defecto
-        }
+    const nombre = inputName.value.toLowerCase().trim();
+    if (nombre.includes("tintura")) {
+        inputMl.value = 250;
+    } else if (nombre.includes("champú") || nombre.includes("champu") || nombre.includes("shampoo")) {
+        inputMl.value = 1000;
+    } else if (nombre.includes("loción") || nombre.includes("locion")) {
+        inputMl.value = 500;
+    } else if (nombre.includes("crema")) {
+        inputMl.value = 500;
     }
 }
 
 // ENVIAR REPOSICIÓN DE INSUMOS
 function submitReplenishment() {
-    const insumo_id = document.getElementById('rep-insumo').value;
+    const insumo_nombre = document.getElementById('rep-insumo').value.trim();
     const unidades = document.getElementById('rep-unidades').value;
     const ml_por_unidad = document.getElementById('rep-ml-unidad').value;
     const precio_total = document.getElementById('rep-precio-total').value;
 
-    if (!insumo_id || !unidades || !ml_por_unidad || !precio_total) {
+    if (!insumo_nombre || !unidades || !ml_por_unidad || !precio_total) {
         alert("Por favor completa todos los campos del formulario de reposición.");
         return;
     }
@@ -1029,7 +1013,7 @@ function submitReplenishment() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            insumo_id,
+            insumo_nombre,
             unidades,
             ml_por_unidad,
             precio_total
@@ -1039,9 +1023,10 @@ function submitReplenishment() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Error en la reposición");
         
-        alert(data.message);
+        alert(data.message || "Reposición registrada con éxito.");
         
         // Limpiar inputs
+        document.getElementById('rep-insumo').value = '';
         document.getElementById('rep-unidades').value = 1;
         document.getElementById('rep-ml-unidad').value = '';
         document.getElementById('rep-precio-total').value = '';

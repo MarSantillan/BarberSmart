@@ -431,10 +431,8 @@
                             <p class="card-desc">Registra la compra de insumos en packs/cajas/botellas, incrementando el stock (ml) y registrando el gasto correspondiente en forma automática.</p>
                             
                             <div class="form-group">
-                                <label for="rep-insumo">Seleccionar Insumo:</label>
-                                <select id="rep-insumo" class="styled-input" onchange="onInsumoChange()">
-                                    <!-- Carga dinámica -->
-                                </select>
+                                <label for="rep-insumo">Nombre del Insumo:</label>
+                                <input type="text" id="rep-insumo" placeholder="Ej. Champú de Ortiga, Tintura Castaño, Crema" class="styled-input" oninput="onInsumoInput()">
                             </div>
                             
                             <div class="form-group">
