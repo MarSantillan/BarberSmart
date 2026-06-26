@@ -880,7 +880,13 @@ function deleteInsumo(id, nombre) {
         return data;
     })
     .then(data => {
-  function loadServiciosOfrecidos() {
+        alert(data.message);
+        loadDashboard();
+    })
+    .catch(err => alert("Error: " + err.message));
+}
+
+function loadServiciosOfrecidos() {
     fetch('/api/servicios-ofrecidos')
         .then(res => {
             if (!res.ok) throw new Error("Error al obtener servicios ofrecidos");
