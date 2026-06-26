@@ -197,10 +197,22 @@ function loadDashboard() {
                 
                 const stockItem = document.createElement('div');
                 stockItem.className = 'stock-item';
+                
+                let actionsHtml = '';
+                if (user.role === 'admin') {
+                    actionsHtml = `
+                        <span class="action-icon edit" onclick="editInsumo(${item.id}, '${item.nombre.replace(/'/g, "\\'")}', ${item.ml_totales}, ${item.ml_actuales})" title="Editar" style="cursor: pointer; font-size: 13px; margin-left: 8px;">✏️</span>
+                        <span class="action-icon delete" onclick="deleteInsumo(${item.id}, '${item.nombre.replace(/'/g, "\\'")}')" title="Eliminar" style="cursor: pointer; font-size: 13px; margin-left: 4px;">❌</span>
+                    `;
+                }
+                
                 stockItem.innerHTML = `
                     <div class="stock-item-info">
                         <span>${item.nombre}</span>
-                        <span>${item.ml_actuales} ml / ${item.ml_totales} ml (${item.porcentaje}%)</span>
+                        <span style="display: flex; align-items: center; gap: 4px;">
+                            ${item.ml_actuales} ml / ${item.ml_totales} ml (${item.porcentaje}%)
+                            ${actionsHtml}
+                        </span>
                     </div>
                     <div class="stock-progress-bg">
                         <div class="stock-progress-fill ${colorClass}" style="width: ${item.porcentaje}%"></div>
@@ -779,6 +791,63 @@ function editExpense(id, currentConcepto, currentMonto) {
         const isJson = res.headers.get('content-type')?.includes('application/json');
         const data = isJson ? await res.json() : null;
         if (!res.ok) throw new Error((data && data.error) || 'Error al actualizar gasto');
+        return data;
+    })
+    .then(data => {
+        alert(data.message);
+        loadDashboard();
+    })
+    .catch(err => alert("Error: " + err.message));
+}
+
+function editInsumo(id, currentNombre, currentMlTotales, currentMlActuales) {
+    const nombre = prompt("Modificar Nombre del Insumo:", currentNombre);
+    if (nombre === null) return;
+    
+    const mlTotalesStr = prompt("Modificar Volumen Total (ml):", currentMlTotales);
+    if (mlTotalesStr === null) return;
+    
+    const mlActualesStr = prompt("Modificar Volumen Actual (ml):", currentMlActuales);
+    if (mlActualesStr === null) return;
+    
+    const ml_totales = parseFloat(mlTotalesStr);
+    const ml_actuales = parseFloat(mlActualesStr);
+    
+    if (!nombre.trim() || isNaN(ml_totales) || ml_totales <= 0 || isNaN(ml_actuales) || ml_actuales < 0 || ml_actuales > ml_totales) {
+        alert("Datos inválidos. El volumen total debe ser mayor a 0, el actual mayor o igual a 0, y el actual no debe superar al total.");
+        return;
+    }
+    
+    fetch(`/api/insumo/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombre.trim(), ml_totales, ml_actuales })
+    })
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) throw new Error((data && data.error) || 'Error al actualizar insumo');
+        return data;
+    })
+    .then(data => {
+        alert(data.message);
+        loadDashboard();
+    })
+    .catch(err => alert("Error: " + err.message));
+}
+
+function deleteInsumo(id, nombre) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar el insumo "${nombre}"?\nEsto lo quitará del stock. Los registros históricos de servicios conservarán los consumos en ml pero se desvincularán de este insumo.`)) {
+        return;
+    }
+    
+    fetch(`/api/insumo/${id}`, {
+        method: 'DELETE'
+    })
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) throw new Error((data && data.error) || 'Error al eliminar insumo');
         return data;
     })
     .then(data => {

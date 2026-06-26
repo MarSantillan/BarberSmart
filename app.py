@@ -211,6 +211,79 @@ def replenish_supply_route():
     return jsonify(res)
 
 
+@app.route('/api/insumo/<int:insumo_id>', methods=['PUT'])
+def edit_insumo(insumo_id):
+    data = request.get_json() or {}
+    nombre = data.get("nombre")
+    ml_totales = data.get("ml_totales")
+    ml_actuales = data.get("ml_actuales")
+    
+    if not nombre or nombre.strip() == "":
+        return jsonify({"error": "El nombre no puede estar vacío."}), 400
+        
+    try:
+        ml_totales = float(ml_totales)
+        ml_actuales = float(ml_actuales)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Los volúmenes (ml) deben ser números válidos."}), 400
+        
+    if ml_totales <= 0:
+        return jsonify({"error": "El volumen total debe ser mayor a 0."}), 400
+    if ml_actuales < 0:
+        return jsonify({"error": "El volumen actual no puede ser menor a 0."}), 400
+    if ml_actuales > ml_totales:
+        return jsonify({"error": "El volumen actual no puede superar al volumen total."}), 400
+        
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Verificar si el insumo existe
+        cursor.execute("SELECT id FROM insumos WHERE id = ?", (insumo_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Insumo no encontrado."}), 404
+            
+        cursor.execute("""
+            UPDATE insumos 
+            SET nombre = ?, ml_totales = ?, ml_actuales = ? 
+            WHERE id = ?
+        """, (nombre.strip(), ml_totales, ml_actuales, insumo_id))
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Insumo actualizado exitosamente."})
+    except Exception as e:
+        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+
+
+@app.route('/api/insumo/<int:insumo_id>', methods=['DELETE'])
+def delete_insumo(insumo_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Verificar si el insumo existe
+        cursor.execute("SELECT id FROM insumos WHERE id = ?", (insumo_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Insumo no encontrado."}), 404
+            
+        # 1. Actualizar servicios_realizados para desvincular el insumo (establecer en NULL)
+        cursor.execute("UPDATE servicios_realizados SET insumo_id = NULL WHERE insumo_id = ?", (insumo_id,))
+        
+        # 2. Borrar registros de la tabla intermedia servicio_insumos
+        cursor.execute("DELETE FROM servicio_insumos WHERE insumo_id = ?", (insumo_id,))
+        
+        # 3. Borrar el insumo físicamente
+        cursor.execute("DELETE FROM insumos WHERE id = ?", (insumo_id,))
+        
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Insumo eliminado correctamente."})
+    except Exception as e:
+        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+
+
 @app.route('/api/turnos')
 def get_turnos():
     barbero_id = request.args.get("barbero_id")
