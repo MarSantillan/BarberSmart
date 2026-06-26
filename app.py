@@ -284,6 +284,123 @@ def delete_insumo(insumo_id):
         return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
 
 
+@app.route('/api/servicios-ofrecidos')
+def get_servicios_ofrecidos():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, nombre, precio FROM servicios_ofrecidos ORDER BY nombre ASC")
+        rows = cursor.fetchall()
+        conn.close()
+        servicios = [{"id": r[0], "nombre": r[1], "precio": r[2]} for r in rows]
+        return jsonify(servicios)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/servicios-ofrecidos', methods=['POST'])
+def create_servicio_ofrecido():
+    data = request.get_json() or {}
+    nombre = data.get("nombre")
+    precio = data.get("precio")
+    
+    if not nombre or nombre.strip() == "":
+        return jsonify({"error": "El nombre del servicio es obligatorio."}), 400
+        
+    try:
+        precio = float(precio)
+    except (ValueError, TypeError):
+        return jsonify({"error": "El precio debe ser un número válido."}), 400
+        
+    if precio <= 0:
+        return jsonify({"error": "El precio debe ser mayor a 0."}), 400
+        
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Verificar duplicado
+        cursor.execute("SELECT id FROM servicios_ofrecidos WHERE nombre = ?", (nombre.strip(),))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Ya existe un servicio con ese nombre."}), 400
+            
+        cursor.execute("""
+            INSERT INTO servicios_ofrecidos (nombre, precio)
+            VALUES (?, ?)
+        """, (nombre.strip(), precio))
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Servicio agregado exitosamente."}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/servicios-ofrecidos/<int:service_id>', methods=['PUT'])
+def edit_servicio_ofrecido(service_id):
+    data = request.get_json() or {}
+    nombre = data.get("nombre")
+    precio = data.get("precio")
+    
+    if not nombre or nombre.strip() == "":
+        return jsonify({"error": "El nombre del servicio es obligatorio."}), 400
+        
+    try:
+        precio = float(precio)
+    except (ValueError, TypeError):
+        return jsonify({"error": "El precio debe ser un número válido."}), 400
+        
+    if precio <= 0:
+        return jsonify({"error": "El precio debe ser mayor a 0."}), 400
+        
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Verificar existencia
+        cursor.execute("SELECT id FROM servicios_ofrecidos WHERE id = ?", (service_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Servicio no encontrado."}), 404
+            
+        # Verificar duplicado de nombre (excluyendo el actual)
+        cursor.execute("SELECT id FROM servicios_ofrecidos WHERE nombre = ? AND id != ?", (nombre.strip(), service_id))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Ya existe otro servicio con ese nombre."}), 400
+            
+        cursor.execute("""
+            UPDATE servicios_ofrecidos
+            SET nombre = ?, precio = ?
+            WHERE id = ?
+        """, (nombre.strip(), precio, service_id))
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Servicio actualizado exitosamente."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/servicios-ofrecidos/<int:service_id>', methods=['DELETE'])
+def delete_servicio_ofrecido(service_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Verificar existencia
+        cursor.execute("SELECT id FROM servicios_ofrecidos WHERE id = ?", (service_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Servicio no encontrado."}), 404
+            
+        cursor.execute("DELETE FROM servicios_ofrecidos WHERE id = ?", (service_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Servicio eliminado exitosamente."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/turnos')
 def get_turnos():
     barbero_id = request.args.get("barbero_id")

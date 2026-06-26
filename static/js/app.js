@@ -40,6 +40,8 @@ function switchTab(tabId) {
         }
     } else if (tabId === 'dashboard') {
         loadDashboard();
+    } else if (tabId === 'servicios-ofrecidos') {
+        loadServiciosOfrecidos();
     }
 }
 
@@ -69,12 +71,14 @@ function checkSession() {
     const navDashboard = document.getElementById("nav-dashboard");
     const navCargarGasto = document.getElementById("nav-cargar-gasto");
     const navAgenda = document.getElementById("nav-agenda-turnos");
+    const navServiciosOfrecidos = document.getElementById("nav-servicios-ofrecidos");
     const srvBarbero = document.getElementById("srv-barbero");
     
     if (user.role === 'barber') {
         // Ocultar tabs administrativas
         if (navDashboard) navDashboard.classList.add("hidden");
         if (navCargarGasto) navCargarGasto.classList.add("hidden");
+        if (navServiciosOfrecidos) navServiciosOfrecidos.classList.add("hidden");
         if (navAgenda) navAgenda.classList.remove("hidden");
         
         // Cargar por defecto la agenda de turnos propia
@@ -91,6 +95,7 @@ function checkSession() {
         // Admin ve todo
         if (navDashboard) navDashboard.classList.remove("hidden");
         if (navCargarGasto) navCargarGasto.classList.remove("hidden");
+        if (navServiciosOfrecidos) navServiciosOfrecidos.classList.remove("hidden");
         if (navAgenda) navAgenda.classList.remove("hidden");
         
         if (srvBarbero) srvBarbero.disabled = false;
@@ -467,6 +472,25 @@ function loadSelectOptions() {
                 populateInsumoDropdown(select);
             });
          });
+
+    fetch('/api/servicios-ofrecidos')
+        .then(res => res.json())
+        .then(data => {
+            window.serviciosOfrecidosData = data; // Guardar en caché global
+            
+            const serviceSelect = document.getElementById('srv-nombre');
+            if (serviceSelect) {
+                serviceSelect.innerHTML = '';
+                data.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.nombre;
+                    opt.innerText = `${s.nombre} ($${s.precio.toLocaleString('es-AR')})`;
+                    serviceSelect.appendChild(opt);
+                });
+                toggleInsumoSection();
+            }
+        })
+        .catch(err => console.error("Error al obtener servicios ofrecidos: ", err));
 }
 
 function populateInsumoDropdown(selectElement) {
@@ -515,9 +539,15 @@ function toggleInsumoSection() {
     const insumoSection = document.getElementById('insumo-section');
     const srvMonto = document.getElementById('srv-monto');
     
-    if (servicio.includes("Tintura")) {
+    if (window.serviciosOfrecidosData) {
+        const found = window.serviciosOfrecidosData.find(s => s.nombre === servicio);
+        if (found) {
+            srvMonto.value = found.precio;
+        }
+    }
+    
+    if (servicio && servicio.includes("Tintura")) {
         insumoSection.classList.remove('hidden');
-        srvMonto.value = 12000;
         
         const container = document.getElementById('insumos-rows-container');
         if (container) {
@@ -542,9 +572,6 @@ function toggleInsumoSection() {
         }
     } else {
         insumoSection.classList.add('hidden');
-        if (servicio === "Corte de pelo") srvMonto.value = 5000;
-        if (servicio === "Recorte de barba") srvMonto.value = 3000;
-        if (servicio === "Corte y Barba") srvMonto.value = 7000;
     }
 }
 
@@ -853,6 +880,131 @@ function deleteInsumo(id, nombre) {
     .then(data => {
         alert(data.message);
         loadDashboard();
+    })
+    .catch(err => alert("Error: " + err.message));
+}
+
+function loadServiciosOfrecidos() {
+    fetch('/api/servicios-ofrecidos')
+        .then(res => {
+            if (!res.ok) throw new Error("Error al obtener servicios ofrecidos");
+            return res.json();
+        })
+        .then(data => {
+            const listContainer = document.getElementById('servicios-ofrecidos-list');
+            if (!listContainer) return;
+            
+            listContainer.innerHTML = '';
+            
+            if (data.length === 0) {
+                listContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 13px;">No hay servicios registrados.</p>`;
+                return;
+            }
+            
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'inv-item';
+                div.style = "display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--card-bg-light); border: 1px solid var(--card-border); border-radius: 8px;";
+                div.innerHTML = `
+                    <span>💇‍♂️ ${item.nombre}</span>
+                    <div class="list-actions" style="display: flex; align-items: center; gap: 8px;">
+                        <strong style="color: var(--success); font-size: 14px;">$${item.precio.toLocaleString('es-AR')}</strong>
+                        <span class="action-icon edit" onclick="editOfferedService(${item.id}, '${item.nombre.replace(/'/g, "\\'")}', ${item.precio})" title="Editar" style="cursor: pointer; font-size: 13px;">✏️</span>
+                        <span class="action-icon delete" onclick="deleteOfferedService(${item.id}, '${item.nombre.replace(/'/g, "\\'")}')" title="Eliminar" style="cursor: pointer; font-size: 13px;">❌</span>
+                    </div>
+                `;
+                listContainer.appendChild(div);
+            });
+        })
+        .catch(err => alert("Error: " + err.message));
+}
+
+function submitOfferedService() {
+    const nombreInput = document.getElementById('srv-ofrecido-nombre');
+    const precioInput = document.getElementById('srv-ofrecido-precio');
+    
+    if (!nombreInput || !precioInput) return;
+    
+    const nombre = nombreInput.value.trim();
+    const precio = parseFloat(precioInput.value);
+    
+    if (!nombre || isNaN(precio) || precio <= 0) {
+        alert("Por favor, ingresa un nombre válido y un precio mayor a 0.");
+        return;
+    }
+    
+    fetch('/api/servicios-ofrecidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, precio })
+    })
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) throw new Error((data && data.error) || 'Error al agregar servicio');
+        return data;
+    })
+    .then(data => {
+        alert(data.message);
+        nombreInput.value = '';
+        precioInput.value = '';
+        loadServiciosOfrecidos();
+        loadSelectOptions();
+    })
+    .catch(err => alert("Error: " + err.message));
+}
+
+function editOfferedService(id, currentNombre, currentPrecio) {
+    const nombre = prompt("Modificar Nombre del Servicio:", currentNombre);
+    if (nombre === null) return;
+    
+    const precioStr = prompt("Modificar Precio ($):", currentPrecio);
+    if (precioStr === null) return;
+    
+    const precio = parseFloat(precioStr);
+    
+    if (!nombre.trim() || isNaN(precio) || precio <= 0) {
+        alert("Datos inválidos. El nombre no debe estar vacío y el precio debe ser mayor a 0.");
+        return;
+    }
+    
+    fetch(`/api/servicios-ofrecidos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombre.trim(), precio })
+    })
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) throw new Error((data && data.error) || 'Error al actualizar servicio');
+        return data;
+    })
+    .then(data => {
+        alert(data.message);
+        loadServiciosOfrecidos();
+        loadSelectOptions();
+    })
+    .catch(err => alert("Error: " + err.message));
+}
+
+function deleteOfferedService(id, nombre) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar el servicio "${nombre}"?\nEsto lo quitará de la carta de opciones. No afectará los servicios que ya fueron registrados anteriormente en la contabilidad.`)) {
+        return;
+    }
+    
+    fetch(`/api/servicios-ofrecidos/${id}`, {
+        method: 'DELETE'
+    })
+    .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) throw new Error((data && data.error) || 'Error al eliminar servicio');
+        return data;
+    })
+    .then(data => {
+        alert(data.message);
+        loadServiciosOfrecidos();
+        loadSelectOptions();
     })
     .catch(err => alert("Error: " + err.message));
 }

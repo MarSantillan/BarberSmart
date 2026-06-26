@@ -211,6 +211,15 @@ def init_db():
     )
     """)
     
+    # 11. Tabla de servicios ofrecidos y precios
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS servicios_ofrecidos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL UNIQUE,
+        precio REAL NOT NULL
+    )
+    """)
+    
     conn.commit()
     conn.close()
     print("Base de datos inicializada correctamente.")
@@ -276,6 +285,20 @@ def seed_db():
         print("Datos de prueba (seed) cargados exitosamente.")
     else:
         print("La base de datos ya contiene datos. Se omitió la carga de seed.")
+        
+    # Seed de servicios ofrecidos independientemente
+    cursor.execute("SELECT COUNT(*) FROM servicios_ofrecidos")
+    if cursor.fetchone()[0] == 0:
+        servicios_defecto = [
+            ('Corte de pelo', 5000.0),
+            ('Recorte de barba', 3000.0),
+            ('Corte y Barba', 7000.0),
+            ('Tintura Negra', 12000.0),
+            ('Tintura Castaño', 12000.0)
+        ]
+        cursor.executemany("INSERT INTO servicios_ofrecidos (nombre, precio) VALUES (?, ?)", servicios_defecto)
+        conn.commit()
+        print("Servicios ofrecidos inicializados por defecto.")
         
     conn.close()
 

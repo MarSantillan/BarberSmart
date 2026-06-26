@@ -91,6 +91,9 @@
                 <button id="nav-cargar-gasto" class="nav-btn" onclick="switchTab('cargar-gasto')">
                     <span class="nav-icon">💸</span> Gastos e Inversión
                 </button>
+                <button id="nav-servicios-ofrecidos" class="nav-btn" onclick="switchTab('servicios-ofrecidos')">
+                    <span class="nav-icon">🏷️</span> Servicios Ofrecidos
+                </button>
             </nav>
             
             <div class="sidebar-footer">
@@ -308,13 +311,7 @@
                         
                         <div class="form-group">
                             <label for="srv-nombre">Servicio Realizado:</label>
-                            <select id="srv-nombre" class="styled-input" onchange="toggleInsumoSection()">
-                                <option value="Corte de pelo">Corte de pelo ($5.000)</option>
-                                <option value="Recorte de barba">Recorte de barba ($3.000)</option>
-                                <option value="Corte y Barba">Corte y Barba ($7.000)</option>
-                                <option value="Tintura Negra">Tintura de Cabello - Negra ($12.000)</option>
-                                <option value="Tintura Castaño">Tintura de Cabello - Castaño ($12.000)</option>
-                            </select>
+                            <select id="srv-nombre" class="styled-input" onchange="toggleInsumoSection()"></select>
                         </div>
 
                         <div class="form-group">
@@ -569,6 +566,44 @@
                             <!-- Carga dinámica -->
                         </tbody>
                     </table>
+                </div>
+            </section>
+            
+            <!-- SECCIÓN 6: SERVICIOS OFRECIDOS (ADMIN ONLY) -->
+            <section id="tab-servicios-ofrecidos" class="tab-content">
+                <header class="tab-header">
+                    <h1>Servicios Ofrecidos</h1>
+                    <p>Administración de servicios de barbería que se ofrecen en el local y sus precios</p>
+                </header>
+
+                <div class="details-grid-two">
+                    <!-- Formulario de Registro -->
+                    <div class="form-card">
+                        <h2>Agregar Nuevo Servicio</h2>
+                        <p class="card-desc">Registra un nuevo servicio en la carta del local para que los clientes puedan reservarlo y los barberos cargarlo.</p>
+                        
+                        <div class="form-group">
+                            <label for="srv-ofrecido-nombre">Nombre del Servicio:</label>
+                            <input type="text" id="srv-ofrecido-nombre" placeholder="Ej. Perfilado de Cejas" class="styled-input">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="srv-ofrecido-precio">Precio de Venta ($):</label>
+                            <input type="number" id="srv-ofrecido-precio" placeholder="Ej. 1500" class="styled-input">
+                        </div>
+                        
+                        <button class="btn btn-primary w-full" onclick="submitOfferedService()">Registrar Servicio</button>
+                    </div>
+
+                    <!-- Listado de Servicios Existentes -->
+                    <div class="detail-card">
+                        <h2>Servicios en la Carta</h2>
+                        <p class="card-desc">Lista de servicios configurados en el local. Los precios pueden modificarse o eliminarse.</p>
+                        
+                        <div id="servicios-ofrecidos-list" class="stock-list" style="max-height: 500px; overflow-y: auto;">
+                            <!-- Cargado dinámicamente -->
+                        </div>
+                    </div>
                 </div>
             </section>
             
