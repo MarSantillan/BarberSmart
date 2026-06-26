@@ -886,6 +886,69 @@ class AIAssistantAgent:
     def process_chat(self, message):
         message_lower = message.lower().strip()
         
+        # 0. Caso especial: "Se acabó el shampoo" (calcular costo promedio por servicio)
+        if ("acabo" in message_lower or "acabó" in message_lower or "termino" in message_lower or "terminó" in message_lower) and \
+           ("champu" in message_lower or "champú" in message_lower or "shampoo" in message_lower or "insumo" in message_lower or "producto" in message_lower):
+            
+            # Buscar qué producto se acabó
+            producto_query = "Champú"
+            if "locion" in message_lower or "loción" in message_lower:
+                producto_query = "Loción"
+            elif "tintura" in message_lower:
+                producto_query = "Tintura"
+                
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Obtener los detalles del insumo
+            cursor.execute("SELECT id, nombre, ml_totales, precio_compra, fecha_compra FROM insumos")
+            rows = cursor.fetchall()
+            
+            best_match = None
+            for row in rows:
+                if producto_query.lower() in row[1].lower():
+                    best_match = row
+                    break
+                    
+            if best_match:
+                insumo_id, nombre, ml_tot, precio_compra, fecha_compra = best_match
+                
+                # Contar cuántos servicios se registraron desde la fecha de compra
+                cursor.execute("""
+                SELECT COUNT(*) FROM servicios_realizados 
+                WHERE fecha >= ?
+                """, (fecha_compra,))
+                cant_servicios = cursor.fetchone()[0]
+                conn.close()
+                
+                if cant_servicios > 0:
+                    ml_promedio = ml_tot / cant_servicios
+                    costo_promedio = precio_compra / cant_servicios
+                    
+                    resp = f"🤖 **Cálculo Estimado de Consumo Promedio:**\n\n"
+                    resp += f"¡Excelente enfoque para calcular costos! El producto **{nombre}** tiene una capacidad original de **{ml_tot:.1f} ml** y un costo de **${precio_compra:,.2f}** (registrado el {fecha_compra}).\n\n"
+                    resp += f"**Cálculo Real de Operación:**\n"
+                    resp += f"• Desde esa fecha, se han registrado **{cant_servicios} servicios** en la barbería.\n"
+                    resp += f"• Dividiendo el envase por los servicios realizados, estimamos un consumo aproximado de **{ml_promedio:.1f} ml por persona**.\n"
+                    resp += f"• El costo aproximado de producto por cada servicio de lavado es de **${costo_promedio:,.2f}**.\n\n"
+                    resp += f"👉 **Recomendación:** Puedes usar este costo promedio de **${costo_promedio:,.2f}** para restarlo de la comisión del barbero en futuros servicios, o utilizar **{ml_promedio:.1f} ml** como consumo por defecto al cargar los servicios."
+                    return resp
+                else:
+                    ml_estimado_por_servicio = 20.0  # estimación promedio de 20ml
+                    servicios_estimados = ml_tot / ml_estimado_por_servicio
+                    costo_estimado = precio_compra / servicios_estimados
+                    
+                    resp = f"🤖 **Cálculo Estimado (Sin servicios previos):**\n\n"
+                    resp += f"Aún no registramos servicios desde la fecha de compra de **{nombre}** ({fecha_compra}).\n\n"
+                    resp += f"Sin embargo, basándonos en consumos de la industria (estimando unos **20.0 ml por servicio**):\n"
+                    resp += f"• El envase de **{ml_tot:.1f} ml** rendiría aproximadamente **{servicios_estimados:.0f} servicios**.\n"
+                    resp += f"• El costo estimado de producto por servicio es de **${costo_estimado:,.2f}**.\n\n"
+                    resp += f"¡En cuanto comiences a registrar servicios, podré calcular el promedio real exacto de tu local!"
+                    return resp
+            else:
+                conn.close()
+                return f"🤖 No encontré ningún producto registrado como '{producto_query}' para hacer el cálculo."
+
         # 1. Buscar patrones de consulta de costo (ej. "cuanto cuesta usar 50ml de tintura negra")
         match_ml = re.search(r"(\d+(?:\.\d+)?)\s*(?:ml|mililitros)", message_lower)
         
