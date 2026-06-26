@@ -85,6 +85,9 @@
                 <button id="nav-cargar-servicio" class="nav-btn" onclick="switchTab('cargar-servicio')">
                     <span class="nav-icon">💇‍♂️</span> Cargar Servicios
                 </button>
+                <button id="nav-ia-chat" class="nav-btn" onclick="switchTab('ia-chat')">
+                    <span class="nav-icon">🤖</span> Copiloto IA
+                </button>
                 <button id="nav-cargar-gasto" class="nav-btn" onclick="switchTab('cargar-gasto')">
                     <span class="nav-icon">💸</span> Gastos e Inversión
                 </button>
@@ -479,6 +482,57 @@
                             <div id="gastos-items-list" style="display: flex; flex-direction: column; gap: 12px;">
                                 <!-- Carga dinámica de gastos -->
                             </div>
+                        </div>
+                    </div>
+                </div>
+            <!-- SECCIÓN 6: COPILOTO IA (CHAT CON ASISTENTE) -->
+            <section id="tab-ia-chat" class="tab-content">
+                <header class="tab-header">
+                    <h1>Copiloto IA - Asistente de Insumos</h1>
+                    <p>Calculadora inteligente de costos de producto e impacto en comisiones netas</p>
+                </header>
+
+                <div class="chat-simulation-container">
+                    <!-- Configuración y Sugerencias -->
+                    <div class="chat-config-card">
+                        <h3>Consultas Sugeridas</h3>
+                        <p class="card-desc">Haz clic en una pregunta para consultarle al copiloto de forma rápida:</p>
+                        <ul class="sugerencias-list">
+                            <li onclick="sendIaSuggestion('¿Cuánto cuesta usar 50ml de Tintura Negra?')">💡 ¿Cuánto cuesta usar 50ml de Tintura Negra?</li>
+                            <li onclick="sendIaSuggestion('¿Cuál es el costo de 60ml de Tintura Castaño?')">💡 ¿Cuál es el costo de 60ml de Tintura Castaño?</li>
+                            <li onclick="sendIaSuggestion('¿Qué insumos están por terminarse o tienen stock bajo?')">💡 ¿Qué insumos están en stock crítico?</li>
+                            <li onclick="sendIaSuggestion('¿Cómo afecta el costo del insumo a mi comisión?')">💡 ¿Cómo afecta el costo del insumo a la comisión?</li>
+                        </ul>
+                        
+                        <div style="margin-top: 24px; padding: 16px; background-color: var(--bg-dark); border-radius: 8px; border: 1px solid var(--card-border);">
+                            <h4 style="font-size: 14px; color:#fff; margin-bottom: 8px;">ℹ️ Regla Contable Aplicada</h4>
+                            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+                                A partir de la Unidad 3, los barberos cobran comisiones sobre el **monto neto** (Monto Cobrado - Costo de Insumos Utilizados). El copiloto te ayuda a calcular este impacto al instante.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Ventana de Chat Premium -->
+                    <div class="form-card" style="display: flex; flex-direction: column; height: 550px; padding: 0; overflow: hidden; background-color: var(--card-bg);">
+                        <div class="chat-header" style="background-color: var(--bg-dark); border-bottom: 1px solid var(--card-border); padding: 16px;">
+                            <span class="chat-avatar" style="font-size: 24px;">🤖</span>
+                            <div class="chat-info">
+                                <h4 style="margin: 0; color:#fff;">SmartBarber Co-pilot</h4>
+                                <span style="font-size: 11px; color: var(--text-muted);">Asistente Inteligente de Negocios</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Caja de Mensajes -->
+                        <div id="ia-chat-messages" style="flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
+                            <div class="message bot" style="align-self: flex-start; background-color: var(--bg-dark); border: 1px solid var(--card-border); border-radius: 12px; border-top-left-radius: 0; padding: 12px 16px; color: #fff; max-width: 85%; font-size: 13px; line-height: 1.5;">
+                                🤖 ¡Hola! Soy tu Copiloto Inteligente. Puedes preguntarme el costo exacto de utilizar mililitros (ml) de tinturas o champús para conocer el descuento en la base de tu comisión, o consultar el inventario de stock actual.
+                            </div>
+                        </div>
+                        
+                        <!-- Input de Chat -->
+                        <div style="padding: 16px; background-color: var(--bg-dark); border-top: 1px solid var(--card-border); display: flex; gap: 12px;">
+                            <input type="text" id="ia-chat-input" placeholder="Pregúntame algo, ej: 'Costo de 40ml de castaño'..." style="flex-grow: 1; background-color: var(--bg-dark); border: 1px solid var(--card-border); border-radius: 6px; color: #fff; padding: 12px; font-size: 13px; outline: none;" onkeypress="handleIaChatKey(event)">
+                            <button class="btn btn-primary" onclick="sendIaChatMessage()" style="padding: 12px 20px;">Enviar</button>
                         </div>
                     </div>
                 </div>

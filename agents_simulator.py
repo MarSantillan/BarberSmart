@@ -628,20 +628,28 @@ class FinanceAgent:
         
         total_gastos_local = gastos_fijos + gastos_insumos
         
-        # 3. Obtener el bruto generado por cada barbero (solo APROBADOS)
+        # 3. Obtener todos los servicios aprobados del mes
         cursor.execute("""
-        SELECT barbero_id, SUM(monto_cobrado) 
-        FROM servicios_realizados 
-        WHERE strftime('%Y-%m', fecha) = ? AND aprobado = 1
-        GROUP BY barbero_id
+        SELECT s.barbero_id, s.monto_cobrado, s.ml_consumidos, i.precio_compra, i.ml_totales 
+        FROM servicios_realizados s
+        LEFT JOIN insumos i ON s.insumo_id = i.id
+        WHERE strftime('%Y-%m', s.fecha) = ? AND s.aprobado = 1
         """, (mes_ano,))
         
-        servicios_por_barbero = cursor.fetchall()
-        total_bruto_generado = sum(s[1] for s in servicios_por_barbero)
+        servicios_mes = cursor.fetchall()
+        total_bruto_generado = sum(s[1] for s in servicios_mes)
         
         # 4. Evaluación de la Comisión Dinámica
-        local_share_standard = total_bruto_generado * 0.50
-        
+        # Calculamos local_share_standard simulando comisiones al 50% descontando costos de producto
+        local_share_standard = 0.0
+        for b_id, monto, ml_cons, precio, ml_tot in servicios_mes:
+            costo_prod = 0.0
+            if ml_cons and ml_cons > 0 and precio and ml_tot and ml_tot > 0:
+                costo_prod = ml_cons * (precio / ml_tot)
+            base_comision = max(0.0, monto - costo_prod)
+            payout_sim = base_comision * 0.50
+            local_share_standard += (monto - payout_sim)
+            
         if total_bruto_generado == 0:
             comision_efectiva = 50.0
             contingencia_activa = False
@@ -653,27 +661,38 @@ class FinanceAgent:
             contingencia_activa = False
             
         # 5. Calcular liquidación para cada barbero
+        barberos_ids = set(s[0] for s in servicios_mes)
         reporte_barberos = []
         shop_share_total = 0.0
         barber_payout_total = 0.0
         
-        for barbero_id, bruto in servicios_por_barbero:
-            cursor.execute("SELECT nombre FROM barberos WHERE id = ?", (barbero_id,))
+        for b_id in sorted(barberos_ids):
+            cursor.execute("SELECT nombre FROM barberos WHERE id = ?", (b_id,))
             b_nombre = cursor.fetchone()[0]
             
-            payout = bruto * (comision_efectiva / 100.0)
-            shop_cut = bruto * ((100.0 - comision_efectiva) / 100.0)
+            bruto = 0.0
+            payout = 0.0
+            for serv_b_id, monto, ml_cons, precio, ml_tot in servicios_mes:
+                if serv_b_id == b_id:
+                    bruto += monto
+                    costo_prod = 0.0
+                    if ml_cons and ml_cons > 0 and precio and ml_tot and ml_tot > 0:
+                        costo_prod = ml_cons * (precio / ml_tot)
+                    base_comision = max(0.0, monto - costo_prod)
+                    payout += base_comision * (comision_efectiva / 100.0)
+                    
+            shop_cut = bruto - payout
             
             # Obtener propinas digitales si las hubiera (solo aprobadas)
             cursor.execute("""
             SELECT SUM(propina_digital) FROM servicios_realizados 
             WHERE barbero_id = ? AND strftime('%Y-%m', fecha) = ? AND aprobado = 1
-            """, (barbero_id, mes_ano))
+            """, (b_id, mes_ano))
             propinas = cursor.fetchone()[0]
             propinas = propinas if propinas else 0.0
             
             reporte_barberos.append({
-                "barbero_id": barbero_id,
+                "barbero_id": b_id,
                 "nombre": b_nombre,
                 "bruto_generado": bruto,
                 "comision_porcentaje": comision_efectiva,
@@ -854,3 +873,107 @@ class SupplyAgent:
             "alerta_bajo_stock": alerta_activa,
             "alerta_mensaje": f"¡ALERTA DE STOCK CRÍTICO! El producto '{nombre}' cuenta con {nuevo_ml:.1f} ml restantes (menos del 15%). Requiere reposición inmediata." if alerta_activa else None
         }
+
+
+# ==========================================
+# 5. AI ASSISTANT AGENT (Copiloto Contable e Insumos)
+# ==========================================
+
+class AIAssistantAgent:
+    def __init__(self):
+        pass
+
+    def process_chat(self, message):
+        message_lower = message.lower().strip()
+        
+        # 1. Buscar patrones de consulta de costo (ej. "cuanto cuesta usar 50ml de tintura negra")
+        match_ml = re.search(r"(\d+(?:\.\d+)?)\s*(?:ml|mililitros)", message_lower)
+        
+        # Identificar producto
+        producto_query = None
+        if "negra" in message_lower:
+            producto_query = "Tintura Negra"
+        elif "castaño" in message_lower or "castano" in message_lower:
+            producto_query = "Tintura Castaño"
+        elif "champu" in message_lower or "champú" in message_lower or "ortiga" in message_lower:
+            producto_query = "Champú"
+        elif "locion" in message_lower or "loción" in message_lower or "menta" in message_lower:
+            producto_query = "Loción"
+        elif "tintura" in message_lower:
+            producto_query = "Tintura"  # genérico
+            
+        if match_ml and producto_query:
+            ml = float(match_ml.group(1))
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Buscar el insumo en la base de datos
+            cursor.execute("SELECT id, nombre, ml_totales, precio_compra, ml_actuales FROM insumos")
+            rows = cursor.fetchall()
+            conn.close()
+            
+            # Filtrar por el que mejor coincida
+            best_match = None
+            for row in rows:
+                if producto_query.lower() in row[1].lower():
+                    best_match = row
+                    break
+                    
+            if best_match:
+                insumo_id, nombre, ml_tot, precio_compra, ml_act = best_match
+                costo_por_ml = precio_compra / ml_tot
+                costo_total = ml * costo_por_ml
+                
+                resp = f"🤖 **Análisis de Costo de Insumo:**\n\n"
+                resp += f"Para el producto **{nombre}**:\n"
+                resp += f"• El costo por envase original es de **${precio_compra:,.2f}** por **{ml_tot:.1f} ml**.\n"
+                resp += f"• Esto equivale a un costo unitario de **${costo_por_ml:,.2f} por ml**.\n\n"
+                resp += f"**Cálculo de Consumo:**\n"
+                resp += f"👉 Usar **{ml:.1f} ml** de este producto para una tintura tiene un costo de **${costo_total:,.2f}**.\n\n"
+                resp += f"⚠️ **Impacto en Comisión:**\n"
+                resp += f"Al realizar una tintura cobrada (por ejemplo, a $12,000.00), al barbero se le restará este costo de insumo (${costo_total:,.2f}) antes de calcular su porcentaje de comisión. "
+                resp += f"La base imponible para su comisión será de **${(12000.0 - costo_total):,.2f}**, por lo que cobraría **${((12000.0 - costo_total) * 0.5):,.2f}** (en split 50/50)."
+                return resp
+            else:
+                return f"🤖 No encontré ningún insumo registrado en el sistema que coincida con '{producto_query}'. Asegúrate de que el producto esté registrado en la sección 'Gastos e Inversión'."
+
+        # 2. Consultar stocks o insumos críticicos
+        if "stock" in message_lower or "quedan" in message_lower or "acaba" in message_lower or "falta" in message_lower or "critico" in message_lower or "crítico" in message_lower:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT nombre, ml_totales, ml_actuales FROM insumos")
+            rows = cursor.fetchall()
+            conn.close()
+            
+            if not rows:
+                return "🤖 Actualmente no hay insumos registrados en el sistema."
+                
+            resp = "🤖 **Estado de Stock y Consumo de Insumos:**\n\n"
+            criticos = []
+            todos = []
+            
+            for nombre, ml_tot, ml_act in rows:
+                pct = (ml_act / ml_tot) * 100
+                status_str = f"• **{nombre}**: {ml_act:.1f} ml / {ml_tot:.1f} ml ({pct:.1f}%)"
+                if pct <= 15.0:
+                    criticos.append(status_str + " ⚠️ **(STOCK BAJO - Requiere Reposición)**")
+                else:
+                    todos.append(status_str)
+                    
+            if criticos:
+                resp += "🚨 **ALERTAS DE REPOSICIÓN (Menos de 15%):**\n"
+                resp += "\n".join(criticos) + "\n\n"
+                
+            resp += "📦 **Inventario General:**\n"
+            resp += "\n".join(todos)
+            return resp
+
+        # 3. Ayuda general o saludo
+        resp = "🤖 **¡Hola! Soy tu Copiloto Inteligente de SmartBarber.**\n\n"
+        resp += "Puedo ayudarte a calcular el costo exacto de los insumos utilizados en los servicios de tintura y teñido para que conozcas la base de comisión neta.\n\n"
+        resp += "**¿Qué me puedes preguntar?**\n"
+        resp += "1. **Cálculo de costos:** *'¿Cuánto cuesta usar 60ml de tintura negra?'* o *'costo de 40ml de castaño'*.\n"
+        resp += "2. **Control de inventario:** *'¿Qué insumos se están acabando?'* o *'ver stock actual'*.\n"
+        resp += "3. **Reglas de negocio:** *'¿Cómo se descuenta el costo de tintura a los barberos?'*.\n\n"
+        resp += "Escribe tu consulta y con gusto haré las cuentas por ti."
+        return resp

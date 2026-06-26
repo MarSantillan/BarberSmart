@@ -1154,3 +1154,86 @@ function toggleMobileMenu() {
         backdrop.classList.toggle('active');
     }
 }
+
+// IA COPILOT CHAT CLIENT
+function sendIaChatMessage() {
+    const input = document.getElementById("ia-chat-input");
+    const message = input.value.trim();
+    if (!message) return;
+
+    // Renderizar mensaje del usuario
+    appendIaMessage(message, "user");
+    input.value = "";
+
+    // Renderizar indicador de escritura
+    const messagesBox = document.getElementById("ia-chat-messages");
+    const typingBubble = document.createElement("div");
+    typingBubble.className = "message bot";
+    typingBubble.id = "ia-typing-bubble";
+    typingBubble.style = "align-self: flex-start; background-color: var(--bg-dark); border: 1px solid var(--card-border); border-radius: 12px; border-top-left-radius: 0; padding: 12px 16px; color: var(--text-muted); max-width: 85%; font-size: 13px; line-height: 1.5; font-style: italic;";
+    typingBubble.innerHTML = "🤖 Escribiendo...";
+    messagesBox.appendChild(typingBubble);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+
+    fetch("/api/ia/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Error de red");
+        return res.json();
+    })
+    .then(data => {
+        // Eliminar indicador de escritura
+        const bubble = document.getElementById("ia-typing-bubble");
+        if (bubble) bubble.remove();
+
+        // Renderizar respuesta formateada
+        appendIaMessage(data.response, "bot");
+    })
+    .catch(err => {
+        const bubble = document.getElementById("ia-typing-bubble");
+        if (bubble) bubble.remove();
+        appendIaMessage("🤖 Disculpa, he tenido un problema al procesar tu consulta. Inténtalo de nuevo.", "bot");
+    });
+}
+
+function appendIaMessage(text, sender) {
+    const messagesBox = document.getElementById("ia-chat-messages");
+    if (!messagesBox) return;
+
+    const bubble = document.createElement("div");
+    bubble.className = `message ${sender}`;
+    
+    // Convertir saltos de línea y formateo markdown simple
+    let formattedText = text
+        .replace(/\n/g, "<br>")
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.*?)\*/g, "<em>$1</em>");
+        
+    if (sender === "user") {
+        bubble.style = "align-self: flex-end; background-color: var(--primary); border-radius: 12px; border-top-right-radius: 0; padding: 12px 16px; color: #fff; max-width: 85%; font-size: 13px; line-height: 1.5;";
+        bubble.innerHTML = formattedText;
+    } else {
+        bubble.style = "align-self: flex-start; background-color: var(--bg-dark); border: 1px solid var(--card-border); border-radius: 12px; border-top-left-radius: 0; padding: 12px 16px; color: #fff; max-width: 85%; font-size: 13px; line-height: 1.5;";
+        bubble.innerHTML = formattedText;
+    }
+
+    messagesBox.appendChild(bubble);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+}
+
+function handleIaChatKey(event) {
+    if (event.key === "Enter") {
+        sendIaChatMessage();
+    }
+}
+
+function sendIaSuggestion(text) {
+    const input = document.getElementById("ia-chat-input");
+    if (input) {
+        input.value = text;
+        sendIaChatMessage();
+    }
+}

@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template
 import sqlite3
 from datetime import datetime
 from database import get_connection, init_db, seed_db
-from agents_simulator import BookingAgent, FinanceAgent, SupplyAgent
+from agents_simulator import BookingAgent, FinanceAgent, SupplyAgent, AIAssistantAgent
 import os
 
 app = Flask(__name__)
@@ -14,6 +14,7 @@ seed_db()
 booking_agent = BookingAgent()
 finance_agent = FinanceAgent()
 supply_agent = SupplyAgent()
+ia_agent = AIAssistantAgent()
 
 @app.route('/')
 def home():
@@ -606,6 +607,19 @@ def start_reminder_thread():
                 
     t = threading.Thread(target=run_scheduler, daemon=True)
     t.start()
+
+@app.route('/api/ia/chat', methods=['POST'])
+def ia_chat_route():
+    data = request.get_json() or {}
+    message = data.get("message", "")
+    if not message:
+        return jsonify({"error": "Mensaje vacío"}), 400
+    
+    response_text = ia_agent.process_chat(message)
+    return jsonify({
+        "status": "success",
+        "response": response_text
+    })
 
 @app.route('/api/recordatorios/procesar', methods=['POST', 'GET'])
 def trigger_reminders():

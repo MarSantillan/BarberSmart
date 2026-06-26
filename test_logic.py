@@ -158,6 +158,49 @@ class TestBarberiaLogic(unittest.TestCase):
         self.assertIsNotNone(gasto)
         self.assertEqual(gasto[1], 16000.0)
 
+    def test_commission_with_product_cost_deduction(self):
+        """
+        Caso 5: Validar que el costo del producto se resta de la base de comisión
+        del barbero antes de aplicar el porcentaje (ej. 50%).
+        """
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Insumo ID 1: Tintura Negra (capacidad 250ml, costo $4,500. Costo por ml = $18)
+        # Servicio realizado por Lucas (ID 1) usando 50ml de Tintura Negra. Monto cobrado: $12,000.
+        # Costo insumo: 50 * 18 = $900. Base comisión: 12000 - 900 = $11,100.
+        cursor.execute("""
+        INSERT INTO servicios_realizados (turno_id, barbero_id, servicio_nombre, monto_cobrado, metodo_pago, ml_consumidos, insumo_id, fecha, aprobado)
+        VALUES (NULL, 1, 'Tintura Negra', 12000.0, 'Efectivo', 50.0, 1, '2026-06-15', 1)
+        """)
+        
+        # Cargar un corte adicional para asegurar ingresos suficientes para evitar la contingencia (split 50/50)
+        # Gastos fijos son $170,000. Necesitamos que la barbería retenga > $170,000.
+        # Cargamos $400,000 extra
+        for _ in range(40):
+            cursor.execute("""
+            INSERT INTO servicios_realizados (turno_id, barbero_id, servicio_nombre, monto_cobrado, metodo_pago, fecha, aprobado)
+            VALUES (NULL, 1, 'Corte de pelo', 10000.0, 'Efectivo', '2026-06-15', 1)
+            """)
+            
+        conn.commit()
+        conn.close()
+        
+        # Ejecutar cierre financiero
+        finance_agent = FinanceAgent()
+        report = finance_agent.run_monthly_closure("2026-06")
+        
+        # Aserciones
+        self.assertFalse(report["contingencia_comision_activa"], "La contingencia no debería estar activa")
+        self.assertEqual(report["comision_aplicada"], 50.0, "La comisión aplicada debería ser del 50%")
+        
+        # Lucas debió cobrar:
+        # - Por los 40 cortes: 40 * 10000 * 0.50 = $200,000
+        # - Por la tintura: (12000 - 900) * 0.50 = $5,550
+        # Total payout neto: $205,550
+        lucas_report = next(b for b in report["reporte_barberos"] if b["barbero_id"] == 1)
+        self.assertEqual(lucas_report["payout_neto"], 205550.0)
+
 
 if __name__ == '__main__':
     unittest.main()
