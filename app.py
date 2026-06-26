@@ -4,6 +4,7 @@ from datetime import datetime
 from database import get_connection, init_db, seed_db
 from agents_simulator import BookingAgent, FinanceAgent, SupplyAgent, AIAssistantAgent
 import os
+import re
 
 app = Flask(__name__)
 
@@ -517,6 +518,25 @@ def update_inversion(item_id):
 def delete_expense(gasto_id):
     conn = get_connection()
     cursor = conn.cursor()
+    
+    # Sincronización: si es una reposición de insumos, eliminar de la tabla insumos
+    cursor.execute("SELECT concepto FROM gastos_fijos WHERE id = ?", (gasto_id,))
+    row = cursor.fetchone()
+    if row:
+        concepto = row[0]
+        if concepto.startswith("Reposición: "):
+            match = re.search(r"Reposición:\s+(.+?)\s+x\d+", concepto)
+            if match:
+                nombre_insumo = match.group(1).strip()
+                cursor.execute("SELECT id FROM insumos WHERE nombre = ?", (nombre_insumo,))
+                ins_row = cursor.fetchone()
+                if ins_row:
+                    ins_id = ins_row[0]
+                    cursor.execute("SELECT COUNT(*) FROM servicios_realizados WHERE insumo_id = ?", (ins_id,))
+                    has_services = cursor.fetchone()[0] > 0
+                    if not has_services:
+                        cursor.execute("DELETE FROM insumos WHERE id = ?", (ins_id,))
+
     cursor.execute("DELETE FROM gastos_fijos WHERE id = ?", (gasto_id,))
     conn.commit()
     conn.close()
@@ -544,6 +564,21 @@ def update_expense(gasto_id):
         
     conn = get_connection()
     cursor = conn.cursor()
+    
+    # Sincronización: si se edita el nombre del insumo repuesto, actualizar en la tabla insumos
+    cursor.execute("SELECT concepto FROM gastos_fijos WHERE id = ?", (gasto_id,))
+    row = cursor.fetchone()
+    if row:
+        concepto_anterior = row[0]
+        if concepto_anterior.startswith("Reposición: ") and concepto.startswith("Reposición: "):
+            match_ant = re.search(r"Reposición:\s+(.+?)\s+x\d+", concepto_anterior)
+            match_new = re.search(r"Reposición:\s+(.+?)\s+x\d+", concepto)
+            if match_ant and match_new:
+                nombre_ant = match_ant.group(1).strip()
+                nombre_new = match_new.group(1).strip()
+                if nombre_ant != nombre_new:
+                    cursor.execute("UPDATE insumos SET nombre = ? WHERE nombre = ?", (nombre_new, nombre_ant))
+
     cursor.execute("UPDATE gastos_fijos SET concepto = ?, monto = ? WHERE id = ?", (concepto, monto, gasto_id))
     conn.commit()
     conn.close()
